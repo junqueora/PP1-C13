@@ -1,0 +1,72 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Empacotamento e build
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+pip-wheel-metadata/
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Linters e verificadores de tipo
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# IDEs e editores
+# ---------------------------------------------------------------------------
+.idea/
+*.iml
+.vscode/
+*.swp
+*~
+
+# ---------------------------------------------------------------------------
+# Sistema operacional
+# ---------------------------------------------------------------------------
+# macOS
+.DS_Store
+.AppleDouble
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---------------------------------------------------------------------------
+# Arquivos locais
+# ---------------------------------------------------------------------------
+.env
+.env.*
+*.log
+*.tmp
+*.bak
+
+# A pasta resultados/ é versionada de propósito: o README usa as figuras e o
+# enunciado pede que os gráficos fiquem salvos no repositório.

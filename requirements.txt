@@ -1,0 +1,6 @@
+numpy>=1.24
+scipy>=1.10
+control>=0.9.4
+matplotlib>=3.6
+PyQt5>=5.15
+pytest>=7.0    # só para rodar os testes (python -m pytest)
