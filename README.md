@@ -21,6 +21,8 @@ PyQt5.
 
 ## A planta
 
+Na Tabela 7 do enunciado a planta do Grupo 3 é o cilindro pneumático. O ensaio não mede posição: mede a pressão no reservatório, em bar, e é essa a variável que o controlador regula.
+
 Um motor elétrico aciona um compressor, que manda ar para um reservatório. A pressão
 sobe até a vazão de entrada empatar com o que sai pelo consumo e pelos vazamentos. O
 controlador mede essa pressão, compara com o SetPoint e ajusta o comando do motor
@@ -43,7 +45,7 @@ reservatório.
 Precisa de Python 3.10 ou mais novo. Usamos o 3.13.
 
 ```bash
-git clone <url-do-repositorio>
+git clone https://github.com/junqueora/PP1-C13.git
 cd PP1-C13
 
 python3 -m venv .venv
@@ -61,7 +63,7 @@ sempre a partir da raiz do projeto:
 
 ```bash
 python scripts/rodar_identificacao.py   # identificação e ajuste fino
-python scripts/rodar_sintonia.py        # malha aberta x fechada e PID
+python scripts/rodar_sintonia.py        # malha aberta x fechada, PID e ajuste fino
 python scripts/validar_pade.py          # comparação do Padé com o atraso exato
 python -m pytest                        # testes dos cálculos
 ```
@@ -73,7 +75,9 @@ A janela tem duas abas.
 Em **Identificação**, clique em "Escolher arquivo" e selecione
 `data/Pneumatico_G3.mat`. O programa valida o arquivo, aplica Smith e Sundaresan e
 já mostra o que teve menor EQM. Dá para alternar entre os dois métodos e o ajuste
-fino. Os valores de k, τ, θ e EQM são só para leitura.
+fino. Os valores de k, τ, θ e EQM são só para leitura. Quando o arquivo traz os
+parâmetros com que o ensaio foi gerado, eles aparecem no painel ao lado do gráfico,
+junto com o motivo de a escolha usar o EQM mesmo com ruído.
 
 A aba **Controle PID** só é liberada depois que um dataset válido é carregado. Nela
 há duas formas de sintonia:
@@ -83,7 +87,9 @@ há duas formas de sintonia:
 - **Manual**: Kp, Ti e Td ficam livres. O botão "Sintonizar" verifica se a malha é
   estável antes de simular.
 
-O SetPoint começa no valor final do ensaio e pode ser alterado. As caixinhas ao lado
+O SetPoint começa no valor final do ensaio e pode ser alterado. A faixa acima do
+gráfico diz qual modelo da identificação está sendo usado na sintonia. No IMC, o
+aviso de status compara o ts simulado com 4λ. As caixinhas ao lado
 de tr, ts e Mp marcam esses pontos no gráfico, e "Exportar" salva a figura. Além do
 que o enunciado pede, colocamos o gráfico do sinal de controle, o valor de pico, o
 erro em regime e um aviso para quando o comando do motor passa de 100 %.
@@ -106,7 +112,11 @@ móvel de 9 amostras. O EQM é calculado contra os dados originais.
 | Smith | 0,01372 | 9,60 | 2,50 | 0,26 | 0,02654 |
 | Sundaresan | 0,01372 | 9,00 | 2,65 | 0,29 | 0,02738 |
 
-Ficamos com o Smith, que teve o menor EQM. A curva sobe sem oscilar depois de um
+Ficamos com o Smith, que teve o menor EQM. O arquivo descreve ruído uniforme de
+2,5 % mais jerk, e o enunciado aponta o Sundaresan como mais adequado para amostra
+ruidosa. O critério que desempata os dois, na seção 6.2, é o menor EQM, e por ele o
+Smith se ajusta melhor. Os parâmetros usados para gerar o ensaio também estão no
+arquivo: k = 0,01374 bar/%, τ = 10 s e θ = 2 s. A curva sobe sem oscilar depois de um
 tempo morto, que é o comportamento de um sistema de primeira ordem com atraso, e por
 isso o modelo FOPDT serve bem:
 
@@ -129,7 +139,8 @@ O EQM cai 14 %. O parâmetro que mais muda é o atraso: o ruído no começo da
 subida empurra para a frente os cruzamentos de 28,3 % e 63,2 %, e o Smith acaba
 estimando um θ maior do que o real. O próprio `.mat` traz os parâmetros usados para
 gerar os dados (τ = 10 s e θ = 2 s), e eles ficam entre os dois modelos. A sintonia
-do PID foi feita com o modelo de Smith, que é o resultado do método pedido.
+oficial do PID usa o modelo de Smith. O efeito de trocar para o ajuste fino está
+na seção "Efeito do ajuste fino na sintonia".
 
 ![Ajuste fino](resultados/figuras/02_ajuste_fino.png)
 
@@ -167,7 +178,8 @@ mas aparece overshoot. Testamos alguns valores:
 | Mp (%) | 5,7 | 0,0 | 0,0 | 0,0 | 0,0 |
 | ts (s) | 10,6 | 11,0 | 12,8 | 16,1 | 20,8 |
 
-Escolhemos λ = 1,2·θ = 3,0 s. Com λ/θ = 1 o overshoot já some na simulação com Padé,
+Escolhemos λ = 1,2·θ = 3,0 s. A regra do método é ts ≈ 4λ, ou seja 12 s; o ts
+simulado foi 12,8 s. Com λ/θ = 1 o overshoot já some na simulação com Padé,
 mas ainda aparece 0,69 % quando simulamos com o atraso. Com
 1,2 ele é zero nos dois casos, e subir mais que isso só deixa a resposta lenta.
 
@@ -189,6 +201,21 @@ disso passa um pouco do SetPoint e depois demora para encostar no valor final.
 ![Comparação entre IMC e ITAE](resultados/figuras/06_comparacao_imc_itae.png)
 
 A tabela com os seis métodos do enunciado está em `resultados/sintonia.csv`.
+
+### Efeito do ajuste fino na sintonia
+
+A tabela acima usa o modelo de Smith, que é o resultado do método pedido. O ajuste fino muda sobretudo o atraso (θ de 2,50 s para 1,68 s), então o PID foi recalculado nele, com a mesma regra λ = 1,2·θ.
+
+| Modelo | Método | λ (s) | Kp (%/bar) | Ti (s) | Td (s) | tr (s) | ts (s) | Mp (%) |
+|---|---|---|---|---|---|---|---|---|
+| Smith | IMC | 3,00 | 186,04 | 10,850 | 1,106 | 6,01 | 12,75 | 0,00 |
+| Smith | ITAE | 3,00 | 220,68 | 12,670 | 0,847 | 2,33 | 19,39 | 0,43 |
+| Ajuste fino | IMC | 2,02 | 281,59 | 11,110 | 0,777 | 4,00 | 8,58 | 0,00 |
+| Ajuste fino | ITAE | 2,02 | 325,50 | 13,303 | 0,589 | 1,70 | 13,76 | 0,00 |
+
+No modelo refinado os dois métodos zeram o overshoot. O IMC continua acomodando antes (8,6 s contra 13,8 s), então a escolha do grupo não muda. O ganho sobe (281 e 325 %/bar): o comando do motor satura ainda mais no início, e a ressalva da simulação linear vale com mais força.
+
+![Smith e ajuste fino na sintonia](resultados/figuras/09_sintonia_ajuste_fino.png)
 
 ## Limitações
 

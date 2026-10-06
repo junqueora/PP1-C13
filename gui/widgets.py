@@ -1,11 +1,11 @@
-"""Componentes reutilizados pelas abas: cabeçalho, campo numérico e área de gráfico."""
+"""Componentes reutilizados pelas abas: campo numérico, cartão e área de gráfico."""
 from __future__ import annotations
 
 import math
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette
-from PyQt5.QtWidgets import QFileDialog, QLabel, QLineEdit, QVBoxLayout, QWidget
+from PyQt5.QtCore import QSize, Qt
+from PyQt5.QtWidgets import (QFileDialog, QFrame, QLabel, QLineEdit, QSizePolicy,
+                             QVBoxLayout, QWidget)
 
 # O PyQt5 precisa ser importado antes do backend para o matplotlib usar a mesma biblioteca.
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
@@ -13,35 +13,43 @@ from matplotlib.figure import Figure
 
 from src.config import PASTA_FIGURAS
 
-TITULO = "Projeto Prático C13 – Sistemas Embarcados"
-SUBTITULO = "Identificação de Processos & Sintonia de Controladores PID"
+TITULO = "Projeto prático C13"
+SUBTITULO = "Identificação de processos e sintonia de controladores PID"
 
 
-def cabecalho() -> QWidget:
-    """Título e subtítulo mostrados no topo de cada aba."""
-    caixa = QWidget()
-    layout = QVBoxLayout(caixa)
-    layout.setContentsMargins(0, 4, 0, 8)
-    titulo = QLabel(f"<b>{TITULO}</b>")
-    titulo.setAlignment(Qt.AlignCenter)
-    fonte = titulo.font()
-    fonte.setPointSize(fonte.pointSize() + 3)
-    titulo.setFont(fonte)
-    subtitulo = QLabel(SUBTITULO)
-    subtitulo.setAlignment(Qt.AlignCenter)
-    layout.addWidget(titulo)
-    layout.addWidget(subtitulo)
-    return caixa
+def pintar(widget):
+    """Faz o fundo definido no tema ser desenhado de fato."""
+    widget.setAttribute(Qt.WA_StyledBackground, True)
+
+
+def definir_aviso(rotulo: QLabel, texto: str, papel: str):
+    """Mostra uma faixa de status. `papel` é ok, alerta, erro ou neutro."""
+    rotulo.setText(texto)
+    rotulo.setVisible(bool(texto))
+    pintar(rotulo)
+    rotulo.setObjectName(papel)
+    rotulo.style().unpolish(rotulo)
+    rotulo.style().polish(rotulo)
+
+
+def cartao(margem: int = 14) -> tuple[QFrame, QVBoxLayout]:
+    quadro = QFrame()
+    quadro.setObjectName("cartao")
+    pintar(quadro)
+    layout = QVBoxLayout(quadro)
+    layout.setContentsMargins(margem, margem, margem, margem)
+    layout.setSpacing(10)
+    return quadro, layout
 
 
 class CampoNumerico(QLineEdit):
     """Campo de texto para números. Aceita vírgula ou ponto como separador decimal."""
 
-    def __init__(self, travado: bool = False, largura: int = 100):
+    def __init__(self, travado: bool = False):
         super().__init__()
         self.setAlignment(Qt.AlignRight)
-        self.setFixedWidth(largura)
-        self._base_editavel = self.palette().color(QPalette.Base)
+        self.setMinimumWidth(96)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.travar(travado)
 
     def valor(self) -> float | None:
@@ -59,12 +67,14 @@ class CampoNumerico(QLineEdit):
             self.setText(format(numero, formato))
 
     def travar(self, travado: bool):
-        """Campo travado fica só para leitura, com o fundo da cor da janela."""
+        """Campo travado fica só para leitura."""
         self.setReadOnly(travado)
-        paleta = self.palette()
-        cor = paleta.color(QPalette.Window) if travado else self._base_editavel
-        paleta.setColor(QPalette.Base, cor)
-        self.setPalette(paleta)
+
+    def marcar_alerta(self, ativo: bool):
+        """Destaca o valor quando ele sai da faixa física do atuador."""
+        self.setProperty("alerta", ativo)
+        self.style().unpolish(self)
+        self.style().polish(self)
 
 
 class Grafico(QWidget):
@@ -72,13 +82,25 @@ class Grafico(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.figura = Figure(layout="constrained")
+        self.figura = Figure(layout="constrained", facecolor="#ffffff")
         self.canvas = FigureCanvasQTAgg(self.figura)
-        self.canvas.setMinimumSize(520, 420)
+        self.canvas.setMinimumSize(480, 380)
+        self.canvas.setStyleSheet("background: #ffffff;")
+        barra = NavigationToolbar2QT(self.canvas, self)
+        barra.setIconSize(QSize(16, 16))
+        barra.setStyleSheet(
+            "QToolBar { background: transparent; border: none; spacing: 2px; }"
+            "QToolButton { background: transparent; border-radius: 6px; padding: 3px; }"
+            "QToolButton:hover { background: #eef2f6; }")
+        for acao in barra.actions():
+            texto = (acao.text() or "").lower()
+            if any(p in texto for p in ("save", "salvar", "subplot", "customize", "configurar")):
+                acao.setVisible(False)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(4, 4, 4, 0)
+        layout.setSpacing(0)
         layout.addWidget(self.canvas, stretch=1)
-        layout.addWidget(NavigationToolbar2QT(self.canvas, self))
+        layout.addWidget(barra)
 
     def limpar(self, mensagem: str = ""):
         self.figura.clear()

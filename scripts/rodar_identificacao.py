@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.stdout.reconfigure(encoding="utf-8")
 
 from src import dataset, graficos, identificacao  # noqa: E402
 from src.config import DATASET_PADRAO, PASTA_FIGURAS  # noqa: E402

@@ -96,27 +96,27 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
     legenda(ax_pv, loc="lower right")
 
     sufixo = f" {unidade}" if unidade else ""
-    caixa = dict(boxstyle="round,pad=0.3", facecolor="#fff8d6", edgecolor=COR_GRADE)
-    seta = dict(arrowstyle="-", color=COR_TEXTO, linewidth=0.8)
+    linhas = []
 
     def ponto(x, y):
-        ax_pv.plot([x], [y], "o", markersize=7, color="#e34948", markeredgecolor="white", zorder=5)
-
-    def anotar(x, y, texto, altura):
-        """Marca o ponto e escreve o rótulo na área livre do gráfico, ligado por uma linha."""
-        ponto(x, y)
-        ax_pv.annotate(texto, (x, y), xytext=(0.42, altura), textcoords="axes fraction",
-                       fontsize=8, bbox=caixa, arrowprops=seta, va="center", zorder=6)
+        ax_pv.plot([x], [y], "o", markersize=6, color=cor, markeredgecolor="white",
+                   markeredgewidth=1.2, zorder=5)
 
     if "mp" in marcar and np.isfinite(q.mp):
-        anotar(q.t_pico, q.pico, f"Pico: {q.pico:.4g}{sufixo}  |  Overshoot: {q.mp:.2f} %", 0.72)
+        ponto(q.t_pico, q.pico)
+        linhas.append(f"Pico  {q.pico:.4g}{sufixo}    overshoot  {q.mp:.2f} %")
     if "tr" in marcar and np.isfinite(q.tr):
         ponto(q.t10, float(np.interp(q.t10, resposta.t, resposta.pv)))
-        anotar(q.t90, float(np.interp(q.t90, resposta.t, resposta.pv)),
-               f"Subida (10–90 %): {q.tr:.2f} s", 0.40)
+        ponto(q.t90, float(np.interp(q.t90, resposta.t, resposta.pv)))
+        linhas.append(f"Subida 10–90 %    {q.tr:.2f} s")
     if "ts" in marcar and np.isfinite(q.ts):
-        anotar(q.ts, float(np.interp(q.ts, resposta.t, resposta.pv)),
-               f"Acomodação (2 %): {q.ts:.2f} s", 0.56)
+        ponto(q.ts, float(np.interp(q.ts, resposta.t, resposta.pv)))
+        linhas.append(f"Acomodação 2 %    {q.ts:.2f} s")
+    if linhas:
+        ax_pv.text(0.98, 0.05, "\n".join(linhas), transform=ax_pv.transAxes,
+                   ha="right", va="bottom", fontsize=8, color=COR_TEXTO, linespacing=1.5,
+                   bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
+                             edgecolor=COR_GRADE, alpha=0.96), zorder=6)
 
     if ax_mv is not None:
         ax_mv.plot(resposta.t, resposta.mv, color=cor, linewidth=1.5, label="MV")
@@ -126,7 +126,7 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
         # vizinhança da faixa do atuador para a curva continuar legível.
         folga = 0.25 * (MV_MAX - MV_MIN)
         ax_mv.set_ylim(MV_MIN - folga, MV_MAX + folga)
-        estilizar(ax_mv, "Tempo (s)", "MV – motor (%)")
+        estilizar(ax_mv, "Tempo (s)", "MV (%)")
         ax_mv.annotate("limites do atuador", (resposta.t[-1], MV_MAX), xytext=(0, 3),
                        textcoords="offset points", ha="right", fontsize=8, color=COR_TEXTO)
 
