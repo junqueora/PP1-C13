@@ -6,11 +6,13 @@ import sys
 
 from PyQt5.QtWidgets import QApplication
 
+from gui.estilo import aplicar
 from gui.janela_principal import JanelaPrincipal
 
 
 def main():
     app = QApplication(sys.argv)
+    aplicar(app)
     janela = JanelaPrincipal()
     janela.show()
     sys.exit(app.exec_())

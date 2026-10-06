@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.stdout.reconfigure(encoding="utf-8")
 
 from src import dataset, graficos, identificacao, metricas, simulacao, sintonia  # noqa: E402
 from src.config import DATASET_PADRAO, N_FILTRO_DERIVADA, PASTA_FIGURAS  # noqa: E402
