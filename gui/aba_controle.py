@@ -381,12 +381,23 @@ class AbaControle(QWidget):
     def _redesenhar(self):
         if self.resposta is None:
             return
+        comparacao = None
+        if self.botao_comparar.isChecked():
+            # Calculada antes de limpar a figura: se falhar, o gráfico atual continua.
+            try:
+                comparacao = self._respostas_comparacao()
+            except ValueError as erro:
+                self.botao_comparar.blockSignals(True)
+                self.botao_comparar.setChecked(False)
+                self.botao_comparar.blockSignals(False)
+                definir_aviso(self.rotulo_alerta, f"Não foi possível comparar IMC × ITAE: {erro}",
+                              "alerta")
         self.grafico.figura.clear()
         ax_pv, ax_mv = self.grafico.figura.subplots(2, 1, sharex=True, height_ratios=[3, 1.2])
-        if self.botao_comparar.isChecked():
+        if comparacao is not None:
             titulo = "IMC × ITAE" + ("  ·  motor limitado" if self.resposta.limitada else "")
-            graficos.desenhar_comparacao(ax_pv, self._respostas_comparacao(), titulo,
-                                         self.ds.unidade, grandeza=self.ds.grandeza, ax_mv=ax_mv)
+            graficos.desenhar_comparacao(ax_pv, comparacao, titulo, self.ds.unidade,
+                                         grandeza=self.ds.grandeza, ax_mv=ax_mv)
             destaques = []
         else:
             marcar = [chave for chave, marca in self.marcas.items() if marca.isChecked()]
@@ -399,21 +410,29 @@ class AbaControle(QWidget):
     def _respostas_comparacao(self) -> dict:
         """IMC e ITAE com o SetPoint atual e a mesma opção de limite do motor.
 
-        O IMC usa o λ do campo; se ele for inválido, volta para λ = 1,2·θ.
+        O IMC usa o λ do campo; se ele for inválido, volta para λ = 1,2·θ. Levanta
+        ValueError quando as regras não se aplicam (θ = 0) ou a malha é instável.
         """
         lam = self.campo_lambda.valor()
-        if lam is None or lam / self.modelo.theta <= sintonia.RAZAO_LAMBDA_MINIMA:
+        try:
+            imc = sintonia.sintonizar("IMC", self.modelo, lam)
+        except ValueError:
             lam = RAZAO_LAMBDA_PADRAO * self.modelo.theta
+            imc = sintonia.sintonizar("IMC", self.modelo, lam)
         simular = (simulacao.simular_controle_saturado if self.resposta.limitada
                    else simulacao.simular_controle)
-        sintonias = {f"IMC (λ = {lam:.3g} s)": sintonia.imc(self.modelo, lam),
-                     "ITAE": sintonia.itae(self.modelo)}
+        sintonias = {f"IMC (λ = {lam:.3g} s)": imc,
+                     "ITAE": sintonia.sintonizar("ITAE", self.modelo)}
         return {nome: simular(self.modelo, pid, self.resposta.sp, self.ds.y0, self.ds.u0)
                 for nome, pid in sintonias.items()}
 
     def _sem_resultado(self, mensagem: str, papel: str = "alerta"):
         """Apaga o gráfico e as métricas quando não há uma sintonia válida."""
         self.resposta = None
+        # Sem resultado não há o que comparar; desliga para não voltar ligado depois.
+        self.botao_comparar.blockSignals(True)
+        self.botao_comparar.setChecked(False)
+        self.botao_comparar.blockSignals(False)
         for campo in (self.campo_tr, self.campo_ts, self.campo_mp, self.campo_pico,
                       self.campo_erro, self.campo_mv):
             campo.clear()
