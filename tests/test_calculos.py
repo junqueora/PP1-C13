@@ -128,6 +128,36 @@ def test_ganho_excessivo_e_detectado_como_instavel():
     assert not simulacao.pid_estavel(m, sintonia.PID(5000.0, 8.0, 0.0))
 
 
+def test_saturacao_sem_atingir_o_limite_coincide_com_a_linear():
+    """Degrau pequeno a partir de 50 % do motor: a MV nunca encosta nos limites."""
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    pid = sintonia.imc(m, 3.0)
+    linear = simulacao.simular_controle(m, pid, sp=0.81, y_inicial=0.80, u_inicial=50.0)
+    limitada = simulacao.simular_controle_saturado(m, pid, sp=0.81, y_inicial=0.80, u_inicial=50.0)
+    assert limitada.mv.max() < 100 and limitada.mv.min() > 0
+    assert limitada.metricas.tr == pytest.approx(linear.metricas.tr, abs=0.1)
+    assert limitada.metricas.ts == pytest.approx(linear.metricas.ts, abs=0.1)
+
+
+def test_saturacao_limita_o_motor_e_deixa_a_subida_mais_lenta():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    pid = sintonia.imc(m, 3.0)
+    linear = simulacao.simular_controle(m, pid, sp=1.0, y_inicial=0.12)
+    limitada = simulacao.simular_controle_saturado(m, pid, sp=1.0, y_inicial=0.12)
+    assert linear.mv.max() > 100
+    assert limitada.mv.max() == pytest.approx(100.0) and limitada.mv.min() >= 0.0
+    assert limitada.pv[-1] == pytest.approx(1.0, abs=1e-3)
+    assert limitada.metricas.tr > linear.metricas.tr
+
+
+def test_setpoint_inalcancavel_para_no_limite_do_motor():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    r = simulacao.simular_controle_saturado(m, sintonia.imc(m, 3.0), sp=2.0, y_inicial=0.12)
+    teto = 0.12 + m.k * 100.0
+    assert r.metricas.valor_final == pytest.approx(teto)
+    assert r.pv[-1] == pytest.approx(teto, abs=1e-3)
+
+
 @pytest.mark.parametrize("marcar, esperados", [
     (("tr", "ts", "mp"), ["Subida", "Acomodação", "Pico"]),
     (("ts",), ["Acomodação"]),

@@ -20,6 +20,8 @@ class AbaControle(QWidget):
         self.ds = None
         self.modelo = None
         self.resposta = None
+        self.pid = None          # última sintonia simulada, para refazer ao mudar opções
+        self.titulo_base = ""
         self.titulo = ""
 
         # --- seleção da forma de sintonia ---------------------------------
@@ -106,6 +108,11 @@ class AbaControle(QWidget):
         botoes.setSpacing(8)
         botoes.addWidget(self.botao_sintonizar, stretch=1)
         botoes.addWidget(self.botao_exportar, stretch=1)
+        self.marca_limitar = QCheckBox("Limitar motor a 0–100 %")
+        self.marca_limitar.setCursor(Qt.PointingHandCursor)
+        self.marca_limitar.setToolTip("Simula com o comando do motor saturado na faixa física "
+                                      "do atuador (com anti-windup e atraso exato).")
+        self.marca_limitar.toggled.connect(self._ressimular)
 
         # --- parâmetros de controle e métricas ------------------------------
         self.campo_sp = CampoNumerico()
@@ -159,6 +166,7 @@ class AbaControle(QWidget):
         lateral.addWidget(self._secao("CONTROLADOR"))
         lateral.addLayout(painel)
         lateral.addLayout(botoes)
+        lateral.addWidget(self.marca_limitar)
         lateral.addSpacing(6)
         lateral.addWidget(self._secao("RESPOSTA"))
         lateral.addLayout(metricas)
@@ -300,7 +308,13 @@ class AbaControle(QWidget):
             self._sem_resultado("Malha fechada instável para estes parâmetros. "
                                 "Reduza Kp ou aumente Ti.", "erro")
             return
-        self.resposta = simulacao.simular_controle(self.modelo, pid, sp, self.ds.y0, self.ds.u0)
+        self.pid, self.titulo_base = pid, titulo
+        if self.marca_limitar.isChecked():
+            self.resposta = simulacao.simular_controle_saturado(
+                self.modelo, pid, sp, self.ds.y0, self.ds.u0)
+            titulo += "  ·  motor limitado"
+        else:
+            self.resposta = simulacao.simular_controle(self.modelo, pid, sp, self.ds.y0, self.ds.u0)
         self.titulo = titulo
         q = self.resposta.metricas
         self.campo_tr.definir(q.tr, ".2f")
@@ -323,16 +337,28 @@ class AbaControle(QWidget):
             ts = self.resposta.metricas.ts
             if lam and ts == ts:
                 ok += f"  Regra do IMC: ts ≈ 4λ = {4 * lam:.2f} s (simulado {ts:.2f} s)."
-        mv_final = float(self.resposta.mv[-1])
+        # Motor necessário em regime: vem do ganho do modelo, vale com ou sem limite.
+        mv_final = self.ds.u0 + (self.resposta.sp - self.ds.y0) / self.modelo.k
+        r = self.resposta
         if not (MV_MIN <= mv_final <= MV_MAX):
             alerta = (f"Este SetPoint exige {mv_final:.0f} % do motor em regime, fora da faixa "
                       f"de {MV_MIN:g} a {MV_MAX:g} %. Não é alcançável na planta real.")
+        elif r.limitada:
+            no_limite = (r.mv >= MV_MAX) | (r.mv <= MV_MIN)
+            tempo = float(no_limite.sum() * (r.t[1] - r.t[0]))
+            alerta = (f"Motor limitado a {MV_MIN:g}–{MV_MAX:g} %: ficou {tempo:.1f} s no limite. "
+                      "Simulação com atraso exato e anti-windup." if tempo > 0 else "")
         elif self.resposta.satura:
             alerta = (f"O comando passa de {MV_MIN:g}–{MV_MAX:g} % no transitório. "
                       "A simulação não limita o motor; na planta a subida seria mais lenta.")
         else:
             alerta = ""
         return ok, alerta
+
+    def _ressimular(self):
+        """Refaz a última simulação válida, por exemplo ao ligar o limite do motor."""
+        if self.pid is not None and self.resposta is not None:
+            self._simular(self.pid, self.titulo_base)
 
     def _publicar(self, texto: str, papel: str):
         definir_aviso(self.rotulo_status, texto, papel)
