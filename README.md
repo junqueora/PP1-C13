@@ -88,14 +88,31 @@ há duas formas de sintonia:
 - **Método**: Kp, Ti e Td são calculados pela regra escolhida e ficam travados. O
   único valor editável é o λ, e só quando o método é o IMC.
 - **Manual**: Kp, Ti e Td ficam livres. O botão "Sintonizar" verifica se a malha é
-  estável antes de simular.
+  estável antes de simular. No modo Método ele continua visível, mas desabilitado.
 
 O SetPoint começa no valor final do ensaio e pode ser alterado. A faixa acima do
 gráfico diz qual modelo da identificação está sendo usado na sintonia. No IMC, o
-aviso de status compara o ts simulado com 4λ. As caixinhas ao lado
-de tr, ts e Mp marcam esses pontos no gráfico, e "Exportar" salva a figura. Além do
-que o enunciado pede, colocamos o gráfico do sinal de controle, o valor de pico, o
-erro em regime e um aviso para quando o comando do motor passa de 100 %.
+aviso de status compara o ts simulado com 4λ. As caixinhas ao lado de tr, ts e Mp
+marcam esses pontos no gráfico, cada um com um rótulo do valor, e "Exportar" salva a
+figura.
+
+## Extras da interface
+
+Além do que o enunciado pede, a interface tem:
+
+- **Gráfico do sinal de controle (MV)** abaixo da resposta, com os limites do motor.
+- **Pico, erro em regime e MV máx** na lateral, junto de tr, ts e Mp.
+- **Aviso de saturação** quando o comando do motor sai de 0–100 % no transitório, e
+  quando o SetPoint exige mais motor do que existe em regime.
+- **Ajuste fino** do modelo na aba Identificação, que pode ser usado na sintonia.
+- **Parâmetros de referência do arquivo** (k, τ e θ com que o ensaio foi gerado) ao
+  lado do modelo identificado.
+- **Limitar motor a 0–100 %**: simula com o atuador saturado, anti-windup e atraso
+  exato. Mostra a resposta realista; ver a seção "Limitações".
+- **Comparar IMC × ITAE**: desenha as duas sintonias no mesmo gráfico, com o mesmo
+  SetPoint, o λ atual e a mesma opção de limite do motor.
+- **Nota da ondulação do Padé** no gráfico, explicando que a oscilação inicial vem da
+  aproximação e não existe na planta.
 
 ## Resultados
 
@@ -241,9 +258,20 @@ percentual. Em sintonias mais agressivas a diferença cresce.
 A derivada pura não dá para simular, então o termo derivativo tem um filtro:
 Td·s/(Td/N·s + 1), com N = 10.
 
-A simulação é linear e não limita o motor. Com Kp perto de 200 %/bar, um degrau
-grande de SetPoint pede bem mais que 100 % do motor no começo. Na planta real ele
-saturaria e a subida seria mais lenta do que a simulada.
+A simulação usada nas tabelas é linear e não limita o motor. Com Kp perto de
+200 %/bar, o degrau de SetPoint pede bem mais que 100 % do motor no começo (MV máx
+de 1825 % no IMC e 2165 % no ITAE). Na planta real ele saturaria e a subida seria
+mais lenta. A opção "Limitar motor a 0–100 %" da interface simula isso:
+
+| Método | Simulação | tr (s) | ts (s) | Mp (%) |
+|---|---|---|---|---|
+| IMC | linear | 5,74 | 12,88 | 0,00 |
+| IMC | motor limitado | 12,22 | 29,13 | 0,00 |
+| ITAE | linear | 2,20 | 19,39 | 0,19 |
+| ITAE | motor limitado | 14,91 | 38,40 | 0,00 |
+
+Com o motor limitado as respostas ficam bem mais lentas, mas a escolha do grupo não
+muda: os dois continuam sem overshoot e o IMC acomoda antes.
 
 ## Estrutura do repositório
 
@@ -260,10 +288,11 @@ PP1-C13/
 │   ├── modelo.py           FOPDT, Padé, malha aberta e fechada
 │   ├── sintonia.py         regras de sintonia e função de transferência do PID
 │   ├── metricas.py         tr, ts e overshoot
-│   ├── simulacao.py        resposta da malha com PID
+│   ├── simulacao.py        resposta da malha com PID (linear e com motor limitado)
 │   └── graficos.py         desenho dos gráficos
 ├── gui/                    interface em PyQt5
 │   ├── janela_principal.py
+│   ├── aba_inicio.py
 │   ├── aba_identificacao.py
 │   ├── aba_controle.py
 │   └── widgets.py
