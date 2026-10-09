@@ -337,10 +337,11 @@ class AbaControle(QWidget):
         self.campo_erro.definir(round(q.erro_regime, 9) + 0.0, ".3g")
         self.campo_mv.definir(self.resposta.mv_max, ".0f")
         self.campo_mv.marcar_alerta(self.resposta.satura)
-        self._redesenhar()
         ok, alerta = self._mensagens()
         definir_aviso(self.rotulo_status, ok, "ok")
         definir_aviso(self.rotulo_alerta, alerta, "alerta")
+        # Depois dos avisos: se a comparação falhar, o aviso dela não é sobrescrito.
+        self._redesenhar()
         self._atualizar_estado()
 
     def _mensagens(self) -> tuple[str, str]:

@@ -22,7 +22,8 @@ class AbaRelatorio(QWidget):
         self.setObjectName("pagina")
         pintar(self)
         self.coletar = coletar
-        self.previas = []        # QPixmap de cada página
+        self.figuras = []        # páginas da prévia (Figure)
+        self.previas = {}        # índice da página -> QPixmap, desenhado só quando é exibido
         self.pagina = 0
 
         # --- seções e geração ---------------------------------------------------
@@ -98,10 +99,13 @@ class AbaRelatorio(QWidget):
             "Não há sintonia válida na aba Controle PID." if sem_sintonia else "")
         figuras = relatorio.paginas(dados, self._secoes())
         if not figuras:
-            self._sem_previa("Escolha ao menos uma seção.")
+            self._sem_previa("A única seção marcada, 'Sintonia atual', não tem sintonia válida "
+                             "na aba Controle PID." if self._secoes() == ("controle",)
+                             else "Escolha ao menos uma seção.")
             return
-        self.previas = [self._renderizar(fig) for fig in figuras]
-        self.pagina = min(self.pagina, len(self.previas) - 1)
+        # Desenhar a página em PNG é a parte cara; só a página exibida é desenhada.
+        self.figuras, self.previas = figuras, {}
+        self.pagina = min(self.pagina, len(figuras) - 1)
         self.botao_gerar.setEnabled(True)
         aviso = ("A seção 'Sintonia atual' foi omitida: não há sintonia válida na aba Controle PID."
                  if sem_sintonia and "controle" in self._secoes() else "")
@@ -134,19 +138,22 @@ class AbaRelatorio(QWidget):
 
     # ------------------------------------------------------------------ #
     def _mostrar(self):
-        total = len(self.previas)
+        total = len(self.figuras)
+        if self.pagina not in self.previas:
+            self.previas[self.pagina] = self._renderizar(self.figuras[self.pagina])
         self.imagem.setPixmap(self.previas[self.pagina])
         self.rotulo_pagina.setText(f"Página {self.pagina + 1} de {total}")
         self.botao_anterior.setEnabled(self.pagina > 0)
         self.botao_proxima.setEnabled(self.pagina < total - 1)
 
     def _virar(self, passo: int):
-        if self.previas:
-            self.pagina = max(0, min(self.pagina + passo, len(self.previas) - 1))
+        if self.figuras:
+            self.pagina = max(0, min(self.pagina + passo, len(self.figuras) - 1))
             self._mostrar()
 
     def _sem_previa(self, mensagem: str):
-        self.previas = []
+        self.figuras, self.previas = [], {}
+        definir_aviso(self.rotulo_status, "", "neutro")     # não deixa status antigo na tela
         self.imagem.clear()
         self.imagem.setText(mensagem)
         self.rotulo_pagina.setText("")

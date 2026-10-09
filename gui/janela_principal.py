@@ -80,7 +80,11 @@ class JanelaPrincipal(QMainWindow):
         if ident.ds is None or controle.identificacao is None:
             return None
         resposta = controle.resposta
-        sp = resposta.sp if resposta is not None else (controle.campo_sp.valor() or ident.ds.yf)
+        if resposta is not None:
+            sp = resposta.sp
+        else:                                # SP = 0 é válido; só cai no padrão se vazio
+            sp = controle.campo_sp.valor()
+            sp = ident.ds.yf if sp is None else sp
         return DadosRelatorio(
             ds=ident.ds, resultados=ident.resultados,
             metodo_modelo=controle.identificacao.metodo, modelo=controle.modelo, sp=sp,
