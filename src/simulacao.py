@@ -91,6 +91,9 @@ def simular_controle_saturado(m: ModeloFOPDT, pid: PID, sp: float, y_inicial: fl
     atraso = int(round(m.theta / dt))          # atraso em número de amostras
     decaimento = np.exp(-dt / m.tau)           # discretização exata da primeira ordem
     tf = pid.td / N_FILTRO_DERIVADA            # constante do filtro da derivada
+    # Discretização exata do filtro: estável para qualquer Td (Euler explícito
+    # divergiria com dt/tf >= 2, ou seja, Td pequeno).
+    ganho_filtro = 1.0 - np.exp(-dt / tf) if tf > 0 else 1.0
     t = np.arange(passos) * dt
     pv = np.empty(passos)
     mv = np.empty(passos)
@@ -101,7 +104,7 @@ def simular_controle_saturado(m: ModeloFOPDT, pid: PID, sp: float, y_inicial: fl
         derivada = 0.0
         if pid.td > 0:
             derivada = pid.td / tf * (erro - erro_filtrado)
-            erro_filtrado += (erro - erro_filtrado) * dt / tf
+            erro_filtrado += (erro - erro_filtrado) * ganho_filtro
         tentativa = integral + erro * dt / pid.ti
         u = u_inicial + pid.kp * (erro + tentativa + derivada)
         if not ((u > MV_MAX and erro > 0) or (u < MV_MIN and erro < 0)):

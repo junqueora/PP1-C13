@@ -266,9 +266,9 @@ mais lenta. A opção "Limitar motor a 0–100 %" da interface simula isso:
 | Método | Simulação | tr (s) | ts (s) | Mp (%) |
 |---|---|---|---|---|
 | IMC | linear | 5,74 | 12,88 | 0,00 |
-| IMC | motor limitado | 12,22 | 29,13 | 0,00 |
+| IMC | motor limitado | 12,09 | 28,45 | 0,00 |
 | ITAE | linear | 2,20 | 19,39 | 0,19 |
-| ITAE | motor limitado | 14,91 | 38,40 | 0,00 |
+| ITAE | motor limitado | 14,68 | 38,04 | 0,00 |
 
 Com o motor limitado as respostas ficam bem mais lentas, mas a escolha do grupo não
 muda: os dois continuam sem overshoot e o IMC acomoda antes.

@@ -135,8 +135,12 @@ def test_saturacao_sem_atingir_o_limite_coincide_com_a_linear():
     linear = simulacao.simular_controle(m, pid, sp=0.81, y_inicial=0.80, u_inicial=50.0)
     limitada = simulacao.simular_controle_saturado(m, pid, sp=0.81, y_inicial=0.80, u_inicial=50.0)
     assert limitada.mv.max() < 100 and limitada.mv.min() > 0
-    assert limitada.metricas.tr == pytest.approx(linear.metricas.tr, abs=0.1)
-    assert limitada.metricas.ts == pytest.approx(linear.metricas.ts, abs=0.1)
+    # Compara as curvas, não o tr: no IMC a resposta fica num patamar em ~90 % e um
+    # desvio mínimo muda o instante do cruzamento. A diferença que sobra é Padé x atraso exato.
+    depois = linear.t > m.theta + 0.5
+    diferenca = np.abs(np.interp(linear.t, limitada.t, limitada.pv) - linear.pv)[depois]
+    assert diferenca.max() < 0.05 * (0.81 - 0.80)
+    assert limitada.metricas.ts == pytest.approx(linear.metricas.ts, abs=0.3)
 
 
 def test_saturacao_limita_o_motor_e_deixa_a_subida_mais_lenta():
@@ -148,6 +152,15 @@ def test_saturacao_limita_o_motor_e_deixa_a_subida_mais_lenta():
     assert limitada.mv.max() == pytest.approx(100.0) and limitada.mv.min() >= 0.0
     assert limitada.pv[-1] == pytest.approx(1.0, abs=1e-3)
     assert limitada.metricas.tr > linear.metricas.tr
+
+
+@pytest.mark.parametrize("td", [0.0, 0.001, 0.01, 0.04])
+def test_saturacao_com_derivada_pequena_nao_diverge(td):
+    """Td pequeno deixa o filtro da derivada muito rápido em relação ao passo dt."""
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    r = simulacao.simular_controle_saturado(m, sintonia.PID(50.0, 10.0, td), sp=1.0, y_inicial=0.12)
+    assert np.all(np.isfinite(r.pv))
+    assert r.pv[-1] == pytest.approx(1.0, abs=1e-3)
 
 
 def test_setpoint_inalcancavel_para_no_limite_do_motor():
