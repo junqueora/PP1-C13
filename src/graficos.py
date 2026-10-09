@@ -93,7 +93,9 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
     ax_pv.plot(resposta.t, resposta.pv, color=cor, linewidth=2, label="PV")
     ax_pv.axhline(resposta.sp, color=COR_REFERENCIA, linewidth=1, linestyle="--", label="SetPoint")
     estilizar(ax_pv, "" if ax_mv is not None else "Tempo (s)", rotulo_saida(unidade, grandeza), titulo)
-    legenda(ax_pv, loc="lower right")
+    # À direita, a meia altura: depois do transitório a curva fica colada no SetPoint
+    # (em cima ou embaixo), então essa região fica livre nos dois sentidos de degrau.
+    legenda(ax_pv, loc="center right")
 
     sufixo = f" {unidade}" if unidade else ""
     # Num degrau de subida a curva continua para cima depois de cada ponto, então
