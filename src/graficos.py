@@ -112,14 +112,16 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
         ax_pv.plot([x], [y], "o", markersize=6, color=cor, markeredgecolor="white",
                    markeredgewidth=1.2, zorder=5)
 
-    def rotulo(x, y, texto, dy, pontos):
-        """Rótulo ligado ao ponto, deslocado `dy` pontos (positivo = acima da curva).
+    def rotulo(x, y, texto, y_texto, pontos):
+        """Rótulo ligado ao ponto (x, y), com o texto na altura `y_texto` (em dados).
 
-        `pontos` são os pontos do gráfico que acionam o rótulo no hover.
+        A altura em dados, e não em pontos de tela, garante a mesma separação entre
+        rótulos vizinhos em qualquer tamanho de gráfico. `pontos` são os pontos que
+        acionam o rótulo no hover.
         """
         direita = x <= t_meio                  # na metade direita o texto vai para a esquerda
-        anotacao = ax_pv.annotate(texto, (x, y), xytext=(18 if direita else -18, sentido * dy),
-                       textcoords="offset points", ha="left" if direita else "right",
+        anotacao = ax_pv.annotate(texto, (x, y), xytext=(18 if direita else -18, y_texto),
+                       textcoords=("offset points", "data"), ha="left" if direita else "right",
                        va="center", fontsize=8, color=COR_TEXTO, zorder=6,
                        bbox=dict(boxstyle="round,pad=0.35", facecolor="white",
                                  edgecolor=COR_GRADE, alpha=0.96),
@@ -135,23 +137,30 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
                        ha="left", va="bottom" if sentido > 0 else "top", fontsize=7.5,
                        fontstyle="italic", color=COR_TEXTO)
 
+    # Subida e acomodação ficam no lado livre da curva, em degraus a partir da mesma
+    # referência (o nível de 90 %), para nunca se sobreporem; o pico fica do outro lado.
+    degrau = abs(resposta.sp - resposta.y_inicial)
+    base = resposta.y_inicial + 0.9 * (resposta.sp - resposta.y_inicial)
     if "tr" in marcar and np.isfinite(q.tr):
         y10 = float(np.interp(q.t10, resposta.t, resposta.pv))
         y90 = float(np.interp(q.t90, resposta.t, resposta.pv))
         ponto(q.t10, y10)
         ponto(q.t90, y90)
-        rotulo(q.t90, y90, f"Subida: {q.tr:.2f} s", -30, [(q.t10, y10), (q.t90, y90)])
+        rotulo(q.t90, y90, f"Subida: {q.tr:.2f} s", base - sentido * 0.17 * degrau,
+               [(q.t10, y10), (q.t90, y90)])
+        destaques[-1][0].set_zorder(7)   # acima da linha de ligação da acomodação
     if "ts" in marcar and np.isfinite(q.ts):
         y_ts = float(np.interp(q.ts, resposta.t, resposta.pv))
         ponto(q.ts, y_ts)
-        rotulo(q.ts, y_ts, f"Acomodação: {q.ts:.2f} s", -62, [(q.ts, y_ts)])
+        rotulo(q.ts, y_ts, f"Acomodação: {q.ts:.2f} s", base - sentido * 0.33 * degrau,
+               [(q.ts, y_ts)])
     if "mp" in marcar and np.isfinite(q.mp):
         ponto(q.t_pico, q.pico)
-        rotulo(q.t_pico, q.pico, f"Pico: {q.pico:.4g}{sufixo} / Overshoot: {q.mp:.2f} %", 22,
-               [(q.t_pico, q.pico)])
+        rotulo(q.t_pico, q.pico, f"Pico: {q.pico:.4g}{sufixo} / Overshoot: {q.mp:.2f} %",
+               q.pico + sentido * 0.12 * degrau, [(q.t_pico, q.pico)])
         # Folga no lado do pico para o rótulo não sair do gráfico nem cobrir o título.
         baixo, alto = ax_pv.get_ylim()
-        folga = 0.25 * abs(resposta.sp - resposta.y_inicial)
+        folga = 0.25 * degrau
         if sentido > 0:
             ax_pv.set_ylim(baixo, max(alto, q.pico + folga))
         else:
