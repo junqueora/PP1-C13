@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pytest
 
-from src import identificacao, metricas, simulacao, sintonia
+from src import graficos, identificacao, metricas, simulacao, sintonia
 from src.config import DATASET_PADRAO
 from src.dataset import Dataset, carregar
 from src.modelo import ModeloFOPDT
@@ -115,3 +115,18 @@ def test_ganho_excessivo_e_detectado_como_instavel():
     m = ModeloFOPDT(0.0137, 9.6, 2.5)
     assert simulacao.pid_estavel(m, sintonia.imc(m, 3.0))
     assert not simulacao.pid_estavel(m, sintonia.PID(5000.0, 8.0, 0.0))
+
+
+@pytest.mark.parametrize("marcar, esperados", [
+    (("tr", "ts", "mp"), ["Subida", "Acomodação", "Pico"]),
+    (("ts",), ["Acomodação"]),
+    ((), []),
+])
+def test_rotulos_so_aparecem_nos_pontos_marcados(marcar, esperados):
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    r = simulacao.simular_controle(m, sintonia.itae(m), sp=1.0, y_inicial=0.12)
+    fig = graficos.figura_controle(r, "", "bar", marcar)
+    textos = [filho.get_text() for filho in fig.axes[0].texts]
+    assert [t.split(":")[0] for t in textos] == esperados
+    if "mp" in marcar:
+        assert textos[-1].startswith("Pico: ") and "bar / Overshoot: " in textos[-1]

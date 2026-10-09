@@ -96,27 +96,45 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
     legenda(ax_pv, loc="lower right")
 
     sufixo = f" {unidade}" if unidade else ""
-    linhas = []
+    # Num degrau de subida a curva continua para cima depois de cada ponto, então
+    # o lado de baixo fica livre; num degrau de descida é o contrário.
+    sentido = 1.0 if resposta.sp >= resposta.y_inicial else -1.0
+    t_meio = 0.5 * (resposta.t[0] + resposta.t[-1])
 
     def ponto(x, y):
         ax_pv.plot([x], [y], "o", markersize=6, color=cor, markeredgecolor="white",
                    markeredgewidth=1.2, zorder=5)
 
-    if "mp" in marcar and np.isfinite(q.mp):
-        ponto(q.t_pico, q.pico)
-        linhas.append(f"Pico  {q.pico:.4g}{sufixo}    overshoot  {q.mp:.2f} %")
+    def rotulo(x, y, texto, dy):
+        """Rótulo ligado ao ponto, deslocado `dy` pontos (positivo = acima da curva)."""
+        direita = x <= t_meio                  # na metade direita o texto vai para a esquerda
+        ax_pv.annotate(texto, (x, y), xytext=(18 if direita else -18, sentido * dy),
+                       textcoords="offset points", ha="left" if direita else "right",
+                       va="center", fontsize=8, color=COR_TEXTO, zorder=6,
+                       bbox=dict(boxstyle="round,pad=0.35", facecolor="white",
+                                 edgecolor=COR_GRADE, alpha=0.96),
+                       arrowprops=dict(arrowstyle="-", color=COR_TEXTO, linewidth=0.7,
+                                       shrinkA=0, shrinkB=4))
+
     if "tr" in marcar and np.isfinite(q.tr):
         ponto(q.t10, float(np.interp(q.t10, resposta.t, resposta.pv)))
-        ponto(q.t90, float(np.interp(q.t90, resposta.t, resposta.pv)))
-        linhas.append(f"Subida 10–90 %    {q.tr:.2f} s")
+        y90 = float(np.interp(q.t90, resposta.t, resposta.pv))
+        ponto(q.t90, y90)
+        rotulo(q.t90, y90, f"Subida: {q.tr:.2f} s", -30)
     if "ts" in marcar and np.isfinite(q.ts):
-        ponto(q.ts, float(np.interp(q.ts, resposta.t, resposta.pv)))
-        linhas.append(f"Acomodação 2 %    {q.ts:.2f} s")
-    if linhas:
-        ax_pv.text(0.98, 0.05, "\n".join(linhas), transform=ax_pv.transAxes,
-                   ha="right", va="bottom", fontsize=8, color=COR_TEXTO, linespacing=1.5,
-                   bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
-                             edgecolor=COR_GRADE, alpha=0.96), zorder=6)
+        y_ts = float(np.interp(q.ts, resposta.t, resposta.pv))
+        ponto(q.ts, y_ts)
+        rotulo(q.ts, y_ts, f"Acomodação: {q.ts:.2f} s", -62)
+    if "mp" in marcar and np.isfinite(q.mp):
+        ponto(q.t_pico, q.pico)
+        rotulo(q.t_pico, q.pico, f"Pico: {q.pico:.4g}{sufixo} / Overshoot: {q.mp:.2f} %", 22)
+        # Folga no lado do pico para o rótulo não sair do gráfico nem cobrir o título.
+        baixo, alto = ax_pv.get_ylim()
+        folga = 0.25 * abs(resposta.sp - resposta.y_inicial)
+        if sentido > 0:
+            ax_pv.set_ylim(baixo, max(alto, q.pico + folga))
+        else:
+            ax_pv.set_ylim(min(baixo, q.pico - folga), alto)
 
     if ax_mv is not None:
         ax_mv.plot(resposta.t, resposta.mv, color=cor, linewidth=1.5, label="MV")
