@@ -88,8 +88,13 @@ def figura_malhas(curvas: dict, titulo: str) -> Figure:
 # --------------------------------------------------------------------------- #
 def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "",
                       marcar=(), cor: str = CORES[0], grandeza: str = "Saída"):
-    """Resposta do controle: PV em cima, MV embaixo. `marcar` aceita 'tr', 'ts' e 'mp'."""
+    """Resposta do controle: PV em cima, MV embaixo. `marcar` aceita 'tr', 'ts' e 'mp'.
+
+    Devolve a lista de rótulos dos pontos marcados, como (anotação, [(x, y), ...]),
+    para a interface poder mostrá-los só quando o mouse passa sobre o ponto.
+    """
     q = resposta.metricas
+    destaques = []
     ax_pv.plot(resposta.t, resposta.pv, color=cor, linewidth=2, label="PV")
     ax_pv.axhline(resposta.sp, color=COR_REFERENCIA, linewidth=1, linestyle="--", label="SetPoint")
     estilizar(ax_pv, "" if ax_mv is not None else "Tempo (s)", rotulo_saida(unidade, grandeza), titulo)
@@ -107,16 +112,20 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
         ax_pv.plot([x], [y], "o", markersize=6, color=cor, markeredgecolor="white",
                    markeredgewidth=1.2, zorder=5)
 
-    def rotulo(x, y, texto, dy):
-        """Rótulo ligado ao ponto, deslocado `dy` pontos (positivo = acima da curva)."""
+    def rotulo(x, y, texto, dy, pontos):
+        """Rótulo ligado ao ponto, deslocado `dy` pontos (positivo = acima da curva).
+
+        `pontos` são os pontos do gráfico que acionam o rótulo no hover.
+        """
         direita = x <= t_meio                  # na metade direita o texto vai para a esquerda
-        ax_pv.annotate(texto, (x, y), xytext=(18 if direita else -18, sentido * dy),
+        anotacao = ax_pv.annotate(texto, (x, y), xytext=(18 if direita else -18, sentido * dy),
                        textcoords="offset points", ha="left" if direita else "right",
                        va="center", fontsize=8, color=COR_TEXTO, zorder=6,
                        bbox=dict(boxstyle="round,pad=0.35", facecolor="white",
                                  edgecolor=COR_GRADE, alpha=0.96),
                        arrowprops=dict(arrowstyle="-", color=COR_TEXTO, linewidth=0.7,
                                        shrinkA=0, shrinkB=4))
+        destaques.append((anotacao, pontos))
 
     # A ondulação durante o tempo morto vem da aproximação de Padé; a simulação com
     # o motor limitado usa o atraso exato e não tem esse efeito.
@@ -127,17 +136,19 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
                        fontstyle="italic", color=COR_TEXTO)
 
     if "tr" in marcar and np.isfinite(q.tr):
-        ponto(q.t10, float(np.interp(q.t10, resposta.t, resposta.pv)))
+        y10 = float(np.interp(q.t10, resposta.t, resposta.pv))
         y90 = float(np.interp(q.t90, resposta.t, resposta.pv))
+        ponto(q.t10, y10)
         ponto(q.t90, y90)
-        rotulo(q.t90, y90, f"Subida: {q.tr:.2f} s", -30)
+        rotulo(q.t90, y90, f"Subida: {q.tr:.2f} s", -30, [(q.t10, y10), (q.t90, y90)])
     if "ts" in marcar and np.isfinite(q.ts):
         y_ts = float(np.interp(q.ts, resposta.t, resposta.pv))
         ponto(q.ts, y_ts)
-        rotulo(q.ts, y_ts, f"Acomodação: {q.ts:.2f} s", -62)
+        rotulo(q.ts, y_ts, f"Acomodação: {q.ts:.2f} s", -62, [(q.ts, y_ts)])
     if "mp" in marcar and np.isfinite(q.mp):
         ponto(q.t_pico, q.pico)
-        rotulo(q.t_pico, q.pico, f"Pico: {q.pico:.4g}{sufixo} / Overshoot: {q.mp:.2f} %", 22)
+        rotulo(q.t_pico, q.pico, f"Pico: {q.pico:.4g}{sufixo} / Overshoot: {q.mp:.2f} %", 22,
+               [(q.t_pico, q.pico)])
         # Folga no lado do pico para o rótulo não sair do gráfico nem cobrir o título.
         baixo, alto = ax_pv.get_ylim()
         folga = 0.25 * abs(resposta.sp - resposta.y_inicial)
@@ -157,6 +168,7 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
         estilizar(ax_mv, "Tempo (s)", "MV (%)")
         ax_mv.annotate("limites do atuador", (resposta.t[-1], MV_MAX), xytext=(0, 3),
                        textcoords="offset points", ha="right", fontsize=8, color=COR_TEXTO)
+    return destaques
 
 
 def figura_controle(resposta, titulo: str, unidade: str = "", marcar=("tr", "ts", "mp"),

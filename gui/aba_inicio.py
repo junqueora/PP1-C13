@@ -22,7 +22,7 @@ PASSOS = ("Na aba Identificação, clique em “Escolher arquivo” e carregue o
           "Escolha o modelo: Smith, Sundaresan ou o ajuste fino. O de menor EQM já vem selecionado.",
           "Vá para a aba Controle PID, liberada depois que o dataset é carregado.",
           "Escolha “Método” (IMC, ITAE…) ou “Manual” para digitar Kp, Ti e Td.",
-          "Ajuste o SetPoint (SP) e confira tr, ts e Mp no gráfico.",
+          "Ajuste o SetPoint (SP) e passe o mouse sobre os pontos do gráfico para ver tr, ts e Mp.",
           "Clique em “Exportar” para salvar o gráfico em PNG ou PDF.")
 
 

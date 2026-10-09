@@ -93,8 +93,8 @@ há duas formas de sintonia:
 O SetPoint começa no valor final do ensaio e pode ser alterado. A faixa acima do
 gráfico diz qual modelo da identificação está sendo usado na sintonia. No IMC, o
 aviso de status compara o ts simulado com 4λ. As caixinhas ao lado de tr, ts e Mp
-marcam esses pontos no gráfico, cada um com um rótulo do valor, e "Exportar" salva a
-figura.
+marcam esses pontos no gráfico. O rótulo com o valor de cada ponto aparece quando o
+mouse passa sobre ele. "Exportar" salva a figura, já com todos os rótulos visíveis.
 
 ## Extras da interface
 

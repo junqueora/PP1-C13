@@ -150,9 +150,9 @@ class AbaControle(QWidget):
         metricas.addWidget(self.campo_sp, 0, 1)
         self.marcas = {}
         dicas = {
-            "tr": "Marcar o tempo de subida no gráfico",
-            "ts": "Marcar o tempo de acomodação no gráfico",
-            "mp": "Marcar o pico e o overshoot no gráfico",
+            "tr": "Marcar o tempo de subida no gráfico (passe o mouse no ponto para ver o valor)",
+            "ts": "Marcar o tempo de acomodação no gráfico (passe o mouse no ponto para ver o valor)",
+            "mp": "Marcar o pico e o overshoot no gráfico (passe o mouse no ponto para ver o valor)",
         }
         for linha, (chave, texto, campo) in enumerate(
                 [("tr", "tr (s)", self.campo_tr), ("ts", "ts (s)", self.campo_ts),
@@ -387,10 +387,13 @@ class AbaControle(QWidget):
             titulo = "IMC × ITAE" + ("  ·  motor limitado" if self.resposta.limitada else "")
             graficos.desenhar_comparacao(ax_pv, self._respostas_comparacao(), titulo,
                                          self.ds.unidade, grandeza=self.ds.grandeza, ax_mv=ax_mv)
+            destaques = []
         else:
             marcar = [chave for chave, marca in self.marcas.items() if marca.isChecked()]
-            graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo, self.ds.unidade,
-                                       marcar, grandeza=self.ds.grandeza)
+            destaques = graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo,
+                                                   self.ds.unidade, marcar, grandeza=self.ds.grandeza)
+        # Os rótulos de tr, ts e pico ficam escondidos e aparecem no hover dos pontos.
+        self.grafico.definir_destaques(destaques)
         self.grafico.atualizar()
 
     def _respostas_comparacao(self) -> dict:
