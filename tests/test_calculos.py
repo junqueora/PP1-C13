@@ -6,6 +6,7 @@ import math
 
 import numpy as np
 import pytest
+from scipy.io import savemat
 
 from src import graficos, identificacao, metricas, simulacao, sintonia
 from src.config import DATASET_PADRAO
@@ -46,6 +47,16 @@ def test_dataset_do_grupo():
     resultados = identificacao.identificar(ds)
     fino = identificacao.ajuste_fino(ds, identificacao.melhor(resultados).modelo)
     assert fino.eqm <= min(r.eqm for r in resultados.values())
+
+
+def test_grandeza_vem_da_unidade_ou_fica_saida(tmp_path):
+    assert carregar(DATASET_PADRAO).grandeza == "Pressão"   # unidade "bar"
+    ds = dataset_sintetico()
+    savemat(tmp_path / "sem_unidade.mat", {"t": ds.t, "degrau": ds.u, "saida": ds.y})
+    assert carregar(tmp_path / "sem_unidade.mat").grandeza == "Saída"
+    savemat(tmp_path / "nivel.mat", {"t": ds.t, "degrau": ds.u, "saida": ds.y,
+                                     "unidade_saida": "m", "grandeza_saida": "Nível"})
+    assert carregar(tmp_path / "nivel.mat").grandeza == "Nível"
 
 
 def test_arquivo_invalido(tmp_path):

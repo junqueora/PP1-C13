@@ -347,7 +347,8 @@ class AbaControle(QWidget):
         self.grafico.figura.clear()
         ax_pv, ax_mv = self.grafico.figura.subplots(2, 1, sharex=True, height_ratios=[3, 1.2])
         marcar = [chave for chave, marca in self.marcas.items() if marca.isChecked()]
-        graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo, self.ds.unidade, marcar)
+        graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo, self.ds.unidade, marcar,
+                                   grandeza=self.ds.grandeza)
         self.grafico.atualizar()
 
     def _sem_resultado(self, mensagem: str, papel: str = "alerta"):

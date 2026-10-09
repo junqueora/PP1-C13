@@ -13,7 +13,6 @@ from src import dataset, graficos, identificacao, modelo, simulacao, sintonia  #
 from src.config import (DATASET_PADRAO, METODOS_GRUPO, PASTA_FIGURAS,  # noqa: E402
                         RAZAO_LAMBDA_PADRAO)
 
-GRANDEZA = "Pressão"
 TECNICAS = ["Ziegler-Nichols", "IMC", "CHR sem sobrevalor", "CHR com sobrevalor",
             "Cohen e Coon", "ITAE"]   # na ordem da Tabela 8
 
@@ -57,7 +56,7 @@ def efeito_do_ajuste_fino(ds, base, fino):
             print(f"{rotulo:<14}{nome:<8}{lam:>8.3f}{pid.kp:>9.2f}{q.tr:>9.2f}{q.ts:>9.2f}{q.mp:>9.2f}")
             curvas[f"{nome}, {rotulo}"] = r
     salvar(graficos.figura_comparacao(
-        curvas, "Smith × ajuste fino", ds.unidade, t_max=40, grandeza=GRANDEZA),
+        curvas, "Smith × ajuste fino", ds.unidade, t_max=40, grandeza=ds.grandeza),
         "09_sintonia_ajuste_fino.png")
 
 
@@ -99,12 +98,12 @@ def main():
     print("Tabela salva: resultados/sintonia.csv")
 
     salvar(graficos.figura_controle(respostas["IMC"], f"Controle PID por IMC (λ = {lam:.3g} s)",
-                                    ds.unidade, grandeza=GRANDEZA), "04_pid_imc.png")
+                                    ds.unidade, grandeza=ds.grandeza), "04_pid_imc.png")
     salvar(graficos.figura_controle(respostas["ITAE"], "Controle PID por ITAE",
-                                    ds.unidade, grandeza=GRANDEZA), "05_pid_itae.png")
+                                    ds.unidade, grandeza=ds.grandeza), "05_pid_itae.png")
     rotulados = {f"IMC (λ = {lam:.3g} s)": respostas["IMC"], "ITAE": respostas["ITAE"]}
     salvar(graficos.figura_comparacao(rotulados, "IMC × ITAE", ds.unidade, t_max=40,
-                                      grandeza=GRANDEZA), "06_comparacao_imc_itae.png")
+                                      grandeza=ds.grandeza), "06_comparacao_imc_itae.png")
 
     # Efeito de lambda no IMC.
     varredura = {}
@@ -112,7 +111,7 @@ def main():
         pid = sintonia.imc(m, razao * m.theta)
         varredura[f"λ/θ = {razao:g}"] = simulacao.simular_controle(m, pid, ds.yf, ds.y0, ds.u0)
     salvar(graficos.figura_comparacao(varredura, "IMC: efeito de λ", ds.unidade, t_max=40,
-                                      grandeza=GRANDEZA), "07_imc_efeito_lambda.png")
+                                      grandeza=ds.grandeza), "07_imc_efeito_lambda.png")
     print(f"\nRegra do IMC: ts ≈ 4λ = {4 * lam:.2f} s "
           f"(ts simulado = {respostas['IMC'].metricas.ts:.2f} s)")
     efeito_do_ajuste_fino(ds, m, fino.modelo)
