@@ -70,7 +70,10 @@ python -m pytest                        # testes dos cálculos
 
 ## Usando a interface
 
-A janela tem duas abas.
+A janela tem três abas.
+
+**Início** apresenta o projeto, o grupo, a planta, os métodos escolhidos e um passo a
+passo de uso. O botão "Começar" leva para a aba Identificação.
 
 Em **Identificação**, clique em "Escolher arquivo" e selecione
 `data/Pneumatico_G3.mat`. O programa valida o arquivo, aplica Smith e Sundaresan e

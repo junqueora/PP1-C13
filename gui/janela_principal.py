@@ -1,4 +1,4 @@
-"""Janela principal: reúne as abas Identificação e Controle PID."""
+"""Janela principal: reúne as abas Início, Identificação e Controle PID."""
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
@@ -6,6 +6,7 @@ from PyQt5.QtWidgets import QLabel, QMainWindow, QTabWidget, QVBoxLayout, QWidge
 
 from gui.aba_controle import AbaControle
 from gui.aba_identificacao import AbaIdentificacao
+from gui.aba_inicio import AbaInicio
 from gui.widgets import SUBTITULO, TITULO, pintar
 
 
@@ -36,12 +37,14 @@ class JanelaPrincipal(QMainWindow):
         topo.addWidget(titulo)
         topo.addWidget(subtitulo)
 
+        self.aba_inicio = AbaInicio()
         self.aba_identificacao = AbaIdentificacao()
         self.aba_controle = AbaControle()
         self.abas = QTabWidget()
         self.abas.setDocumentMode(True)
         self.abas.tabBar().setDrawBase(False)
-        self.abas.addTab(self.aba_identificacao, "Identificação")
+        self.abas.addTab(self.aba_inicio, "Início")
+        self.indice_identificacao = self.abas.addTab(self.aba_identificacao, "Identificação")
         self.indice_controle = self.abas.addTab(self.aba_controle, "Controle PID")
         # A aba de controle só é liberada depois que um dataset válido é selecionado.
         self.abas.setTabEnabled(self.indice_controle, False)
@@ -51,6 +54,8 @@ class JanelaPrincipal(QMainWindow):
         coluna.addWidget(self.abas, stretch=1)
         self.setCentralWidget(raiz)
 
+        self.aba_inicio.comecar.connect(
+            lambda: self.abas.setCurrentIndex(self.indice_identificacao))
         self.aba_identificacao.modelo_definido.connect(self._ao_definir_modelo)
 
     def _ao_definir_modelo(self, ds, identificacao):

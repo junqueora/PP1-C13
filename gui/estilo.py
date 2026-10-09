@@ -25,6 +25,24 @@ QLabel#subtituloApp {
     font-size: 12px;
     color: #5c6b7a;
 }
+QLabel#tituloInicio {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1c2430;
+}
+QLabel#subtituloInicio {
+    font-size: 15px;
+    color: #3d4c5c;
+}
+QLabel#numeroPasso {
+    background: #e8f1ff;
+    color: #1f6feb;
+    border-radius: 12px;
+    font-weight: 600;
+}
+QScrollArea, QScrollArea > QWidget > QWidget {
+    background: #f3f5f8;
+}
 QLabel#secao {
     font-size: 12px;
     font-weight: 600;
