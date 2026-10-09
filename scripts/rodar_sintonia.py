@@ -13,9 +13,6 @@ from src import dataset, graficos, identificacao, modelo, simulacao, sintonia  #
 from src.config import (DATASET_PADRAO, METODOS_GRUPO, PASTA_FIGURAS,  # noqa: E402
                         RAZAO_LAMBDA_PADRAO)
 
-TECNICAS = ["Ziegler-Nichols", "IMC", "CHR sem sobrevalor", "CHR com sobrevalor",
-            "Cohen e Coon", "ITAE"]   # na ordem da Tabela 8
-
 
 def salvar(fig, nome):
     PASTA_FIGURAS.mkdir(parents=True, exist_ok=True)
@@ -76,7 +73,7 @@ def main():
     print(f"\nDegrau de SetPoint: {ds.y0:.3f} → {ds.yf:.3f} {ds.unidade}")
     print(f"{'Método':<20}{'Kp':>9}{'Ti':>8}{'Td':>8}{'tr (s)':>9}{'ts (s)':>9}{'Mp (%)':>9}")
     respostas, linhas_csv = {}, []
-    for tecnica, nome in enumerate(TECNICAS, start=1):
+    for tecnica, nome in enumerate(sintonia.TECNICAS, start=1):
         pid = sintonia.sintonizar(nome, m, lam)
         r = simulacao.simular_controle(m, pid, ds.yf, ds.y0, ds.u0)
         q = r.metricas

@@ -14,8 +14,7 @@ from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
 
 from src import graficos, simulacao, sintonia
-from src.config import (INTEGRANTES, METODOS_GRUPO, RAZAO_LAMBDA_PADRAO, SUBTITULO,
-                        TITULO)
+from src.config import INTEGRANTES, METODOS_GRUPO, SUBTITULO, TITULO
 from src.graficos import COR_GRADE, COR_TEXTO
 
 A4 = (8.27, 11.69)             # retrato, em polegadas
@@ -133,9 +132,7 @@ def _pagina_controle(fig, dados: DadosRelatorio, topo: float):
 def _pagina_comparacao(fig, dados: DadosRelatorio, topo: float):
     m, ds = dados.modelo, dados.ds
     y = _secao(fig, topo, "4. Comparação dos métodos de sintonia")
-    lam = dados.lam
-    if lam is None or m.theta <= 0 or lam / m.theta <= sintonia.RAZAO_LAMBDA_MINIMA:
-        lam = RAZAO_LAMBDA_PADRAO * m.theta
+    lam = sintonia.lambda_ou_padrao(m, dados.lam)
     y = _paragrafos(fig, y, [
         f"Mesmo degrau de SetPoint ({ds.y0:.4g} → {dados.sp:.4g} {ds.unidade}), modelo "
         f"{dados.metodo_modelo}, λ = {lam:.3g} s no IMC. Métodos do Grupo 3 em destaque.",
@@ -143,8 +140,7 @@ def _pagina_comparacao(fig, dados: DadosRelatorio, topo: float):
 
     simular = simulacao.simular_controle_saturado if dados.limitada else simulacao.simular_controle
     corpo, destaque = [], []
-    for nome in ["Ziegler-Nichols", "IMC", "CHR sem sobrevalor", "CHR com sobrevalor",
-                 "Cohen e Coon", "ITAE"]:
+    for nome in sintonia.TECNICAS:
         try:
             pid = sintonia.sintonizar(nome, m, lam)
             q = simular(m, pid, dados.sp, ds.y0, ds.u0).metricas

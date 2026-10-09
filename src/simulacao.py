@@ -7,7 +7,7 @@ import control as ct
 import numpy as np
 
 from src import metricas, modelo as mod, sintonia
-from src.config import MV_MAX, MV_MIN, N_FILTRO_DERIVADA, RAZAO_LAMBDA_PADRAO
+from src.config import MV_MAX, MV_MIN, N_FILTRO_DERIVADA
 from src.metricas import Metricas
 from src.modelo import ModeloFOPDT
 from src.sintonia import PID
@@ -134,11 +134,8 @@ def comparar_imc_itae(m: ModeloFOPDT, lam: float | None, sp: float, y_inicial: f
     Se `lam` for inválido para o IMC, usa λ = 1,2·θ. Levanta ValueError quando as
     regras não se aplicam (θ = 0) ou a malha é instável.
     """
-    try:
-        imc = sintonia.sintonizar("IMC", m, lam)
-    except ValueError:
-        lam = RAZAO_LAMBDA_PADRAO * m.theta
-        imc = sintonia.sintonizar("IMC", m, lam)
+    lam = sintonia.lambda_ou_padrao(m, lam)
+    imc = sintonia.sintonizar("IMC", m, lam)
     simular = simular_controle_saturado if limitada else simular_controle
     sintonias = {f"IMC (λ = {lam:.3g} s)": imc, "ITAE": sintonia.sintonizar("ITAE", m)}
     return {nome: simular(m, pid, sp, y_inicial, u_inicial) for nome, pid in sintonias.items()}

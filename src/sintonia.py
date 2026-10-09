@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import control as ct
 
-from src.config import N_FILTRO_DERIVADA
+from src.config import N_FILTRO_DERIVADA, RAZAO_LAMBDA_PADRAO
 from src.modelo import ModeloFOPDT
 
 RAZAO_LAMBDA_MINIMA = 0.8   # critério de desempenho do IMC: lambda/theta > 0,8
@@ -68,6 +68,18 @@ METODOS = {
     "Cohen e Coon": cohen_coon,
     "ITAE": itae,
 }
+
+
+# As seis técnicas do enunciado, na ordem da Tabela 8.
+TECNICAS = ("Ziegler-Nichols", "IMC", "CHR sem sobrevalor", "CHR com sobrevalor",
+            "Cohen e Coon", "ITAE")
+
+
+def lambda_ou_padrao(m: ModeloFOPDT, lam: float | None) -> float:
+    """Devolve `lam` se ele atende o critério do IMC; senão, λ = 1,2·θ."""
+    if lam is not None and m.theta > 0 and lam / m.theta > RAZAO_LAMBDA_MINIMA:
+        return lam
+    return RAZAO_LAMBDA_PADRAO * m.theta
 
 
 def sintonizar(metodo: str, m: ModeloFOPDT, lam: float | None = None) -> PID:
