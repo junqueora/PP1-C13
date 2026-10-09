@@ -192,14 +192,20 @@ mas ainda aparece 0,69 % quando simulamos com o atraso. Com
 
 ### Qual método atende melhor o critério
 
-O critério do grupo é o menor overshoot. Os dois métodos ficam abaixo de 1 %, mas o
-IMC é o mais adequado. Ele zera o overshoot com λ = 3,0 s, contra 0,43 % do ITAE, e
-o λ dá um controle direto sobre o compromisso entre velocidade e overshoot, o que
-permite deixar uma folga caso o modelo não esteja exato. De quebra, acomoda antes:
-12,8 s contra 19,4 s.
+O critério do grupo é o menor overshoot, e os dois métodos o atendem: o IMC fica em
+0,00 % e o ITAE em 0,19 %, praticamente zero nos dois casos (bem abaixo do ruído de
+2,5 % do próprio ensaio). Com o atraso exato no lugar do Padé, o ITAE vai a 0,32 % e o
+IMC continua em 0,00 %.
 
-O ITAE sobe mais rápido (2,3 s contra 6,0 s) porque usa um ganho maior. Por causa
-disso passa um pouco do SetPoint e depois demora para encostar no valor final.
+Ficamos com o IMC por dois motivos:
+
+- **Acomoda bem mais rápido:** 12,9 s contra 19,4 s do ITAE.
+- **O λ dá controle direto** sobre o compromisso entre velocidade e overshoot, o que
+  permite deixar uma folga caso o modelo não esteja exato. O ITAE não tem esse ajuste:
+  Kp, Ti e Td saem direto da regra.
+
+O ITAE sobe mais rápido (2,2 s contra 5,7 s) porque usa um ganho maior. Por causa
+disso encosta no SetPoint logo no início e depois demora para assentar no valor final.
 
 ![Comparação entre IMC e ITAE](resultados/figuras/06_comparacao_imc_itae.png)
 
