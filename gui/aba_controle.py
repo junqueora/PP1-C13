@@ -230,8 +230,8 @@ class AbaControle(QWidget):
         self.campo_lambda.travar(not imc)              # λ só existe no método IMC
         self.campo_lambda.setEnabled(imc)
         self.botoes_limpar[self.campo_lambda].setVisible(imc)
-        self.botao_sintonizar.setVisible(not metodo)
-        self.botao_sintonizar.setEnabled(self.modelo is not None)
+        # Sempre visível; no modo Método os valores vêm da regra, então fica desabilitado.
+        self.botao_sintonizar.setEnabled(not metodo and self.modelo is not None)
         self.botao_exportar.setEnabled(self.resposta is not None)
 
     def _ao_trocar_modo(self):

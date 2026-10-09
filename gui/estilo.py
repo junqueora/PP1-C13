@@ -191,7 +191,7 @@ QPushButton#primario {
 }
 QPushButton#primario:hover { background: #1a62d6; }
 QPushButton#primario:pressed { background: #164fb0; }
-QPushButton#primario:disabled { background: #c5d8f6; color: #ffffff; }
+QPushButton#primario:disabled { background: #e3e7ec; color: #98a2b0; }
 
 QToolButton#icone {
     background: transparent;
