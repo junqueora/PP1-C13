@@ -118,6 +118,14 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
                        arrowprops=dict(arrowstyle="-", color=COR_TEXTO, linewidth=0.7,
                                        shrinkA=0, shrinkB=4))
 
+    # A ondulação durante o tempo morto vem da aproximação de Padé; a simulação com
+    # o motor limitado usa o atraso exato e não tem esse efeito.
+    if not resposta.limitada and np.isfinite(q.t10):
+        ax_pv.annotate("ondulação inicial: efeito da aproximação de Padé,\nnão existe na planta real",
+                       (q.t10, resposta.y_inicial), xytext=(12, 0), textcoords="offset points",
+                       ha="left", va="bottom" if sentido > 0 else "top", fontsize=7.5,
+                       fontstyle="italic", color=COR_TEXTO)
+
     if "tr" in marcar and np.isfinite(q.tr):
         ponto(q.t10, float(np.interp(q.t10, resposta.t, resposta.pv)))
         y90 = float(np.interp(q.t90, resposta.t, resposta.pv))

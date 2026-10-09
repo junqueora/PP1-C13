@@ -167,7 +167,18 @@ def test_rotulos_so_aparecem_nos_pontos_marcados(marcar, esperados):
     m = ModeloFOPDT(0.0137, 9.6, 2.5)
     r = simulacao.simular_controle(m, sintonia.itae(m), sp=1.0, y_inicial=0.12)
     fig = graficos.figura_controle(r, "", "bar", marcar)
-    textos = [filho.get_text() for filho in fig.axes[0].texts]
+    textos = [filho.get_text() for filho in fig.axes[0].texts
+              if not filho.get_text().startswith("ondulação")]
     assert [t.split(":")[0] for t in textos] == esperados
     if "mp" in marcar:
         assert textos[-1].startswith("Pico: ") and "bar / Overshoot: " in textos[-1]
+
+
+def test_nota_do_pade_so_aparece_na_simulacao_com_pade():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    pid = sintonia.imc(m, 3.0)
+    for simular, tem_nota in ((simulacao.simular_controle, True),
+                              (simulacao.simular_controle_saturado, False)):
+        fig = graficos.figura_controle(simular(m, pid, sp=1.0, y_inicial=0.12), "", "bar", ())
+        notas = [t for t in fig.axes[0].texts if "Padé" in t.get_text()]
+        assert bool(notas) == tem_nota
