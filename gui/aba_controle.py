@@ -54,10 +54,26 @@ class AbaControle(QWidget):
         self.rotulo_regra = QLabel("Regra")
         self.rotulo_regra.setObjectName("campo")
 
+        # --- opções de simulação ----------------------------------------------
+        self.marca_limitar = QCheckBox("Limitar motor a 0–100 %")
+        self.marca_limitar.setCursor(Qt.PointingHandCursor)
+        self.marca_limitar.setToolTip("Simula com o comando do motor saturado na faixa física "
+                                      "do atuador (com anti-windup e atraso exato).")
+        self.marca_limitar.toggled.connect(self._ressimular)
+        self.botao_comparar = QPushButton("Comparar IMC × ITAE")
+        self.botao_comparar.setCheckable(True)
+        self.botao_comparar.setCursor(Qt.PointingHandCursor)
+        self.botao_comparar.setToolTip("Mostra as respostas do IMC e do ITAE no mesmo gráfico, "
+                                       "com o mesmo SetPoint.")
+        self.botao_comparar.toggled.connect(self._redesenhar)
+
         topo = QHBoxLayout()
         topo.setSpacing(12)
         topo.addWidget(segmento)
         topo.addStretch(1)
+        topo.addWidget(self.marca_limitar)
+        topo.addWidget(self.botao_comparar)
+        topo.addSpacing(12)
         topo.addWidget(self.rotulo_regra)
         topo.addWidget(self.combo_metodo)
 
@@ -108,11 +124,6 @@ class AbaControle(QWidget):
         botoes.setSpacing(8)
         botoes.addWidget(self.botao_sintonizar, stretch=1)
         botoes.addWidget(self.botao_exportar, stretch=1)
-        self.marca_limitar = QCheckBox("Limitar motor a 0–100 %")
-        self.marca_limitar.setCursor(Qt.PointingHandCursor)
-        self.marca_limitar.setToolTip("Simula com o comando do motor saturado na faixa física "
-                                      "do atuador (com anti-windup e atraso exato).")
-        self.marca_limitar.toggled.connect(self._ressimular)
 
         # --- parâmetros de controle e métricas ------------------------------
         self.campo_sp = CampoNumerico()
@@ -166,7 +177,6 @@ class AbaControle(QWidget):
         lateral.addWidget(self._secao("CONTROLADOR"))
         lateral.addLayout(painel)
         lateral.addLayout(botoes)
-        lateral.addWidget(self.marca_limitar)
         lateral.addSpacing(6)
         lateral.addWidget(self._secao("RESPOSTA"))
         lateral.addLayout(metricas)
@@ -241,6 +251,7 @@ class AbaControle(QWidget):
         # Sempre visível; no modo Método os valores vêm da regra, então fica desabilitado.
         self.botao_sintonizar.setEnabled(not metodo and self.modelo is not None)
         self.botao_exportar.setEnabled(self.resposta is not None)
+        self.botao_comparar.setEnabled(self.resposta is not None)
 
     def _ao_trocar_modo(self):
         self._atualizar_estado()
@@ -372,10 +383,30 @@ class AbaControle(QWidget):
             return
         self.grafico.figura.clear()
         ax_pv, ax_mv = self.grafico.figura.subplots(2, 1, sharex=True, height_ratios=[3, 1.2])
-        marcar = [chave for chave, marca in self.marcas.items() if marca.isChecked()]
-        graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo, self.ds.unidade, marcar,
-                                   grandeza=self.ds.grandeza)
+        if self.botao_comparar.isChecked():
+            titulo = "IMC × ITAE" + ("  ·  motor limitado" if self.resposta.limitada else "")
+            graficos.desenhar_comparacao(ax_pv, self._respostas_comparacao(), titulo,
+                                         self.ds.unidade, grandeza=self.ds.grandeza, ax_mv=ax_mv)
+        else:
+            marcar = [chave for chave, marca in self.marcas.items() if marca.isChecked()]
+            graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo, self.ds.unidade,
+                                       marcar, grandeza=self.ds.grandeza)
         self.grafico.atualizar()
+
+    def _respostas_comparacao(self) -> dict:
+        """IMC e ITAE com o SetPoint atual e a mesma opção de limite do motor.
+
+        O IMC usa o λ do campo; se ele for inválido, volta para λ = 1,2·θ.
+        """
+        lam = self.campo_lambda.valor()
+        if lam is None or lam / self.modelo.theta <= sintonia.RAZAO_LAMBDA_MINIMA:
+            lam = RAZAO_LAMBDA_PADRAO * self.modelo.theta
+        simular = (simulacao.simular_controle_saturado if self.resposta.limitada
+                   else simulacao.simular_controle)
+        sintonias = {f"IMC (λ = {lam:.3g} s)": sintonia.imc(self.modelo, lam),
+                     "ITAE": sintonia.itae(self.modelo)}
+        return {nome: simular(self.modelo, pid, self.resposta.sp, self.ds.y0, self.ds.u0)
+                for nome, pid in sintonias.items()}
 
     def _sem_resultado(self, mensagem: str, papel: str = "alerta"):
         """Apaga o gráfico e as métricas quando não há uma sintonia válida."""
@@ -401,7 +432,10 @@ class AbaControle(QWidget):
     def _exportar(self):
         if self.resposta is None:
             return
-        nome = "manual" if not self._modo_metodo() else self.combo_metodo.currentText()
+        if self.botao_comparar.isChecked():
+            nome = "comparacao_imc_itae"
+        else:
+            nome = "manual" if not self._modo_metodo() else self.combo_metodo.currentText()
         nome = nome.lower().replace(" ", "_").replace("-", "_")
         caminho = self.grafico.exportar(f"pid_{nome}.png")
         if caminho:

@@ -159,20 +159,36 @@ def figura_controle(resposta, titulo: str, unidade: str = "", marcar=("tr", "ts"
     return fig
 
 
-def figura_comparacao(respostas: dict, titulo: str, unidade: str = "", t_max: float | None = None,
-                      grandeza: str = "Saída") -> Figure:
-    """Várias sintonias no mesmo gráfico. `respostas` = {nome: RespostaControle}."""
-    fig = Figure(figsize=(9, 5), layout="constrained")
-    ax = fig.add_subplot()
+def desenhar_comparacao(ax, respostas: dict, titulo: str = "", unidade: str = "",
+                        t_max: float | None = None, grandeza: str = "Saída", ax_mv=None):
+    """Várias sintonias no mesmo eixo. `respostas` = {nome: RespostaControle}.
+
+    Com `ax_mv`, desenha também o sinal de controle de cada sintonia.
+    """
     primeira = next(iter(respostas.values()))
     for cor, (nome, r) in zip(CORES, respostas.items()):
         ax.plot(r.t, r.pv, color=cor, linewidth=2,
                 label=f"{nome} (Mp = {r.metricas.mp:.1f} %, ts = {r.metricas.ts:.1f} s)")
+        if ax_mv is not None:
+            ax_mv.plot(r.t, r.mv, color=cor, linewidth=1.5)
     ax.axhline(primeira.sp, color=COR_REFERENCIA, linewidth=1, linestyle="--", label="SetPoint")
     if t_max is not None:
         ax.set_xlim(0, t_max)
-    estilizar(ax, "Tempo (s)", rotulo_saida(unidade, grandeza), titulo)
+    estilizar(ax, "Tempo (s)" if ax_mv is None else "", rotulo_saida(unidade, grandeza), titulo)
     legenda(ax, loc="lower right")
+    if ax_mv is not None:
+        for limite in (MV_MIN, MV_MAX):
+            ax_mv.axhline(limite, color=COR_REFERENCIA, linewidth=1, linestyle=":")
+        folga = 0.25 * (MV_MAX - MV_MIN)
+        ax_mv.set_ylim(MV_MIN - folga, MV_MAX + folga)
+        estilizar(ax_mv, "Tempo (s)", "MV (%)")
+
+
+def figura_comparacao(respostas: dict, titulo: str, unidade: str = "", t_max: float | None = None,
+                      grandeza: str = "Saída") -> Figure:
+    """Várias sintonias no mesmo gráfico. `respostas` = {nome: RespostaControle}."""
+    fig = Figure(figsize=(9, 5), layout="constrained")
+    desenhar_comparacao(fig.add_subplot(), respostas, titulo, unidade, t_max, grandeza)
     return fig
 
 
