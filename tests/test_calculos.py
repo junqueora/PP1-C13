@@ -164,6 +164,24 @@ def test_saturacao_com_derivada_pequena_nao_diverge(td):
     assert r.pv[-1] == pytest.approx(1.0, abs=1e-3)
 
 
+def test_saturacao_com_ganho_negativo_espelha_o_caso_normal():
+    """Processo de ação reversa (k < 0, Kp < 0): o anti-windup deve agir igual, espelhado."""
+    direto = ModeloFOPDT(0.0137, 9.6, 2.5)
+    reverso = ModeloFOPDT(-0.0137, 9.6, 2.5)
+    pid = sintonia.imc(direto, 3.0)
+    pid_reverso = sintonia.PID(-pid.kp, pid.ti, pid.td)
+    a = simulacao.simular_controle_saturado(direto, pid, sp=1.0, y_inicial=0.12)
+    b = simulacao.simular_controle_saturado(reverso, pid_reverso, sp=0.12 - 0.88, y_inicial=0.12)
+    assert b.mv == pytest.approx(a.mv, abs=1e-6)
+    assert b.metricas.mp == pytest.approx(a.metricas.mp, abs=1e-6)
+
+
+def test_saturacao_rejeita_malha_instavel():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    with pytest.raises(ValueError):
+        simulacao.simular_controle_saturado(m, sintonia.PID(5000.0, 8.0, 0.0), sp=1.0, y_inicial=0.12)
+
+
 def test_setpoint_inalcancavel_para_no_limite_do_motor():
     m = ModeloFOPDT(0.0137, 9.6, 2.5)
     r = simulacao.simular_controle_saturado(m, sintonia.imc(m, 3.0), sp=2.0, y_inicial=0.12)

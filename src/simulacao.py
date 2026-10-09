@@ -83,9 +83,13 @@ def simular_controle_saturado(m: ModeloFOPDT, pid: PID, sp: float, y_inicial: fl
     passo, com o atraso exato (buffer do sinal de controle) em vez de Padé. A
     integral para de acumular enquanto o motor está saturado e o erro empurra
     para o mesmo lado (anti-windup por congelamento), como num CLP real.
+
+    Levanta ValueError se a malha linear for instável, como simular_controle.
     """
+    pv_sp, _ = malha_com_pid(m, pid)
+    if not mod.estavel(pv_sp):
+        raise ValueError("Malha fechada instável para estes parâmetros.")
     if t_final is None:
-        pv_sp, _ = malha_com_pid(m, pid)
         t_final = mod.horizonte(pv_sp, minimo=10 * (m.tau + m.theta))
     passos = int(round(t_final / dt)) + 1
     atraso = int(round(m.theta / dt))          # atraso em número de amostras
@@ -107,8 +111,11 @@ def simular_controle_saturado(m: ModeloFOPDT, pid: PID, sp: float, y_inicial: fl
             erro_filtrado += (erro - erro_filtrado) * ganho_filtro
         tentativa = integral + erro * dt / pid.ti
         u = u_inicial + pid.kp * (erro + tentativa + derivada)
-        if not ((u > MV_MAX and erro > 0) or (u < MV_MIN and erro < 0)):
-            integral = tentativa               # anti-windup: só integra fora da saturação
+        # Anti-windup: não integra quando isso empurraria a MV ainda mais para dentro da
+        # saturação. O sentido do empurrão é o sinal de Kp·erro (vale também para Kp < 0).
+        empurra = pid.kp * erro
+        if not ((u > MV_MAX and empurra > 0) or (u < MV_MIN and empurra < 0)):
+            integral = tentativa
         mv[i] = min(max(u, MV_MIN), MV_MAX)
         u_atrasado = mv[i - atraso] if i >= atraso else u_inicial
         desvio = decaimento * desvio + (1.0 - decaimento) * m.k * (u_atrasado - u_inicial)
