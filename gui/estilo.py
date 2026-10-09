@@ -25,6 +25,24 @@ QLabel#subtituloApp {
     font-size: 12px;
     color: #5c6b7a;
 }
+QLabel#tituloInicio {
+    font-size: 22px;
+    font-weight: 600;
+    color: #1c2430;
+}
+QLabel#subtituloInicio {
+    font-size: 15px;
+    color: #3d4c5c;
+}
+QLabel#numeroPasso {
+    background: #e8f1ff;
+    color: #1f6feb;
+    border-radius: 12px;
+    font-weight: 600;
+}
+QScrollArea, QScrollArea > QWidget > QWidget {
+    background: #f3f5f8;
+}
 QLabel#secao {
     font-size: 12px;
     font-weight: 600;
@@ -161,6 +179,11 @@ QPushButton {
 }
 QPushButton:hover { background: #f4f7fb; }
 QPushButton:pressed { background: #e8edf3; }
+QPushButton:checked {
+    background: #e8f1ff;
+    border-color: #1f6feb;
+    color: #1f6feb;
+}
 QPushButton:disabled {
     background: #f3f5f8;
     color: #98a2b0;
@@ -173,7 +196,7 @@ QPushButton#primario {
 }
 QPushButton#primario:hover { background: #1a62d6; }
 QPushButton#primario:pressed { background: #164fb0; }
-QPushButton#primario:disabled { background: #c5d8f6; color: #ffffff; }
+QPushButton#primario:disabled { background: #e3e7ec; color: #98a2b0; }
 
 QToolButton#icone {
     background: transparent;

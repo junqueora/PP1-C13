@@ -3,11 +3,13 @@
 Execute a partir da raiz do projeto:  python -m pytest
 """
 import math
+import re
 
 import numpy as np
 import pytest
+from scipy.io import savemat
 
-from src import identificacao, metricas, simulacao, sintonia
+from src import graficos, identificacao, metricas, relatorio, simulacao, sintonia
 from src.config import DATASET_PADRAO
 from src.dataset import Dataset, carregar
 from src.modelo import ModeloFOPDT
@@ -46,6 +48,16 @@ def test_dataset_do_grupo():
     resultados = identificacao.identificar(ds)
     fino = identificacao.ajuste_fino(ds, identificacao.melhor(resultados).modelo)
     assert fino.eqm <= min(r.eqm for r in resultados.values())
+
+
+def test_grandeza_vem_da_unidade_ou_fica_saida(tmp_path):
+    assert carregar(DATASET_PADRAO).grandeza == "Pressão"   # unidade "bar"
+    ds = dataset_sintetico()
+    savemat(tmp_path / "sem_unidade.mat", {"t": ds.t, "degrau": ds.u, "saida": ds.y})
+    assert carregar(tmp_path / "sem_unidade.mat").grandeza == "Saída"
+    savemat(tmp_path / "nivel.mat", {"t": ds.t, "degrau": ds.u, "saida": ds.y,
+                                     "unidade_saida": "m", "grandeza_saida": "Nível"})
+    assert carregar(tmp_path / "nivel.mat").grandeza == "Nível"
 
 
 def test_arquivo_invalido(tmp_path):
@@ -115,3 +127,129 @@ def test_ganho_excessivo_e_detectado_como_instavel():
     m = ModeloFOPDT(0.0137, 9.6, 2.5)
     assert simulacao.pid_estavel(m, sintonia.imc(m, 3.0))
     assert not simulacao.pid_estavel(m, sintonia.PID(5000.0, 8.0, 0.0))
+
+
+def test_saturacao_sem_atingir_o_limite_coincide_com_a_linear():
+    """Degrau pequeno a partir de 50 % do motor: a MV nunca encosta nos limites."""
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    pid = sintonia.imc(m, 3.0)
+    linear = simulacao.simular_controle(m, pid, sp=0.81, y_inicial=0.80, u_inicial=50.0)
+    limitada = simulacao.simular_controle_saturado(m, pid, sp=0.81, y_inicial=0.80, u_inicial=50.0)
+    assert limitada.mv.max() < 100 and limitada.mv.min() > 0
+    # Compara as curvas, não o tr: no IMC a resposta fica num patamar em ~90 % e um
+    # desvio mínimo muda o instante do cruzamento. A diferença que sobra é Padé x atraso exato.
+    depois = linear.t > m.theta + 0.5
+    diferenca = np.abs(np.interp(linear.t, limitada.t, limitada.pv) - linear.pv)[depois]
+    assert diferenca.max() < 0.05 * (0.81 - 0.80)
+    assert limitada.metricas.ts == pytest.approx(linear.metricas.ts, abs=0.3)
+
+
+def test_saturacao_limita_o_motor_e_deixa_a_subida_mais_lenta():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    pid = sintonia.imc(m, 3.0)
+    linear = simulacao.simular_controle(m, pid, sp=1.0, y_inicial=0.12)
+    limitada = simulacao.simular_controle_saturado(m, pid, sp=1.0, y_inicial=0.12)
+    assert linear.mv.max() > 100
+    assert limitada.mv.max() == pytest.approx(100.0) and limitada.mv.min() >= 0.0
+    assert limitada.pv[-1] == pytest.approx(1.0, abs=1e-3)
+    assert limitada.metricas.tr > linear.metricas.tr
+
+
+@pytest.mark.parametrize("td", [0.0, 0.001, 0.01, 0.04])
+def test_saturacao_com_derivada_pequena_nao_diverge(td):
+    """Td pequeno deixa o filtro da derivada muito rápido em relação ao passo dt."""
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    r = simulacao.simular_controle_saturado(m, sintonia.PID(50.0, 10.0, td), sp=1.0, y_inicial=0.12)
+    assert np.all(np.isfinite(r.pv))
+    assert r.pv[-1] == pytest.approx(1.0, abs=1e-3)
+
+
+def test_saturacao_com_ganho_negativo_espelha_o_caso_normal():
+    """Processo de ação reversa (k < 0, Kp < 0): o anti-windup deve agir igual, espelhado."""
+    direto = ModeloFOPDT(0.0137, 9.6, 2.5)
+    reverso = ModeloFOPDT(-0.0137, 9.6, 2.5)
+    pid = sintonia.imc(direto, 3.0)
+    pid_reverso = sintonia.PID(-pid.kp, pid.ti, pid.td)
+    a = simulacao.simular_controle_saturado(direto, pid, sp=1.0, y_inicial=0.12)
+    b = simulacao.simular_controle_saturado(reverso, pid_reverso, sp=0.12 - 0.88, y_inicial=0.12)
+    assert b.mv == pytest.approx(a.mv, abs=1e-6)
+    assert b.metricas.mp == pytest.approx(a.metricas.mp, abs=1e-6)
+
+
+def test_saturacao_rejeita_malha_instavel():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    with pytest.raises(ValueError):
+        simulacao.simular_controle_saturado(m, sintonia.PID(5000.0, 8.0, 0.0), sp=1.0, y_inicial=0.12)
+
+
+def test_setpoint_inalcancavel_para_no_limite_do_motor():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    r = simulacao.simular_controle_saturado(m, sintonia.imc(m, 3.0), sp=2.0, y_inicial=0.12)
+    teto = 0.12 + m.k * 100.0
+    assert r.metricas.valor_final == pytest.approx(teto)
+    assert r.pv[-1] == pytest.approx(teto, abs=1e-3)
+
+
+def dados_relatorio(theta=2.5, com_sintonia=True):
+    ds = carregar(DATASET_PADRAO)
+    resultados = identificacao.identificar(ds)
+    m = ModeloFOPDT(0.013723, 9.6, theta)
+    pid = sintonia.PID(50.0, 10.0, 0.0)
+    resposta = simulacao.simular_controle(m, pid, ds.yf, ds.y0) if com_sintonia else None
+    return relatorio.DadosRelatorio(ds, resultados, "Smith", m, ds.yf, 3.0, resposta, pid,
+                                    "Sintonia manual")
+
+
+@pytest.mark.parametrize("secoes, paginas", [
+    (("identificacao", "controle", "comparacao"), 3),
+    (("comparacao",), 1),
+    ((), 0),
+])
+def test_relatorio_tem_uma_pagina_por_secao(secoes, paginas):
+    assert len(relatorio.paginas(dados_relatorio(), secoes)) == paginas
+
+
+def test_relatorio_omite_controle_sem_sintonia_valida():
+    assert len(relatorio.paginas(dados_relatorio(com_sintonia=False))) == 2
+
+
+def test_relatorio_gera_pdf_valido(tmp_path):
+    destino = tmp_path / "relatorio.pdf"
+    relatorio.salvar_pdf(destino, relatorio.paginas(dados_relatorio()))
+    conteudo = destino.read_bytes()
+    assert conteudo.startswith(b"%PDF")
+    assert len(re.findall(rb"/Type\s*/Page(?!s)", conteudo)) == 3   # páginas, sem o nó /Pages
+
+
+def test_relatorio_com_theta_zero_nao_quebra():
+    """Sem atraso as regras de sintonia não se aplicam; a tabela mostra o motivo."""
+    figuras = relatorio.paginas(dados_relatorio(theta=0.0), ("comparacao",))
+    textos = [t.get_text() for ax in figuras[0].axes for t in ax.texts] + \
+             [t.get_text() for t in figuras[0].texts]
+    assert any("IMC × ITAE" in t for t in textos)
+
+
+@pytest.mark.parametrize("marcar, esperados", [
+    (("tr", "ts", "mp"), ["Subida", "Acomodação", "Pico"]),
+    (("ts",), ["Acomodação"]),
+    ((), []),
+])
+def test_rotulos_so_aparecem_nos_pontos_marcados(marcar, esperados):
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    r = simulacao.simular_controle(m, sintonia.itae(m), sp=1.0, y_inicial=0.12)
+    fig = graficos.figura_controle(r, "", "bar", marcar)
+    textos = [filho.get_text() for filho in fig.axes[0].texts
+              if not filho.get_text().startswith("ondulação")]
+    assert [t.split(":")[0] for t in textos] == esperados
+    if "mp" in marcar:
+        assert textos[-1].startswith("Pico: ") and "bar / Overshoot: " in textos[-1]
+
+
+def test_nota_do_pade_so_aparece_na_simulacao_com_pade():
+    m = ModeloFOPDT(0.0137, 9.6, 2.5)
+    pid = sintonia.imc(m, 3.0)
+    for simular, tem_nota in ((simulacao.simular_controle, True),
+                              (simulacao.simular_controle_saturado, False)):
+        fig = graficos.figura_controle(simular(m, pid, sp=1.0, y_inicial=0.12), "", "bar", ())
+        notas = [t for t in fig.axes[0].texts if "Padé" in t.get_text()]
+        assert bool(notas) == tem_nota

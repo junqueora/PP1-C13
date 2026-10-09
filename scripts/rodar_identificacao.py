@@ -11,8 +11,6 @@ sys.stdout.reconfigure(encoding="utf-8")
 from src import dataset, graficos, identificacao  # noqa: E402
 from src.config import DATASET_PADRAO, PASTA_FIGURAS  # noqa: E402
 
-GRANDEZA = "Pressão"
-
 
 def main():
     ds = dataset.carregar(DATASET_PADRAO)
@@ -40,9 +38,9 @@ def main():
     PASTA_FIGURAS.mkdir(parents=True, exist_ok=True)
     figuras = {
         "01_identificacao.png": graficos.figura_identificacao(
-            ds, list(resultados.values()), "Identificação: Smith × Sundaresan", GRANDEZA),
+            ds, list(resultados.values()), "Identificação: Smith × Sundaresan", ds.grandeza),
         "02_ajuste_fino.png": graficos.figura_identificacao(
-            ds, [escolhido, fino], f"Ajuste fino a partir de {escolhido.metodo}", GRANDEZA),
+            ds, [escolhido, fino], f"Ajuste fino a partir de {escolhido.metodo}", ds.grandeza),
     }
     for nome, fig in figuras.items():
         fig.savefig(PASTA_FIGURAS / nome, dpi=200)

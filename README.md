@@ -70,7 +70,10 @@ python -m pytest                        # testes dos cálculos
 
 ## Usando a interface
 
-A janela tem duas abas.
+A janela tem quatro abas.
+
+**Início** apresenta o projeto, o grupo, a planta, os métodos escolhidos e um passo a
+passo de uso. O botão "Começar" leva para a aba Identificação.
 
 Em **Identificação**, clique em "Escolher arquivo" e selecione
 `data/Pneumatico_G3.mat`. O programa valida o arquivo, aplica Smith e Sundaresan e
@@ -85,14 +88,40 @@ há duas formas de sintonia:
 - **Método**: Kp, Ti e Td são calculados pela regra escolhida e ficam travados. O
   único valor editável é o λ, e só quando o método é o IMC.
 - **Manual**: Kp, Ti e Td ficam livres. O botão "Sintonizar" verifica se a malha é
-  estável antes de simular.
+  estável antes de simular. No modo Método ele continua visível, mas desabilitado.
 
 O SetPoint começa no valor final do ensaio e pode ser alterado. A faixa acima do
 gráfico diz qual modelo da identificação está sendo usado na sintonia. No IMC, o
-aviso de status compara o ts simulado com 4λ. As caixinhas ao lado
-de tr, ts e Mp marcam esses pontos no gráfico, e "Exportar" salva a figura. Além do
-que o enunciado pede, colocamos o gráfico do sinal de controle, o valor de pico, o
-erro em regime e um aviso para quando o comando do motor passa de 100 %.
+aviso de status compara o ts simulado com 4λ. As caixinhas ao lado de tr, ts e Mp
+marcam esses pontos no gráfico. O rótulo com o valor de cada ponto aparece quando o
+mouse passa sobre ele. "Exportar" salva a figura, já com todos os rótulos visíveis.
+
+A aba **Relatório** é liberada junto com a de controle. Ela monta um PDF em A4 com o
+que está selecionado nas outras abas: identificação (tabela dos métodos e curva de
+reação), sintonia atual (parâmetros, métricas e resposta) e comparação dos métodos
+(tabela dos seis métodos e gráfico IMC × ITAE). Dá para escolher as seções, ver a
+prévia de cada página e clicar em "Gerar PDF".
+
+## Extras da interface
+
+Além do que o enunciado pede, a interface tem:
+
+- **Gráfico do sinal de controle (MV)** abaixo da resposta, com os limites do motor.
+- **Pico, erro em regime e MV máx** na lateral, junto de tr, ts e Mp.
+- **Aviso de saturação** quando o comando do motor sai de 0–100 % no transitório, e
+  quando o SetPoint exige mais motor do que existe em regime.
+- **Ajuste fino** do modelo na aba Identificação, que pode ser usado na sintonia.
+- **Parâmetros de referência do arquivo** (k, τ e θ com que o ensaio foi gerado) ao
+  lado do modelo identificado.
+- **Limitar motor a 0–100 %**: simula com o atuador saturado, anti-windup e atraso
+  exato. Mostra a resposta realista; ver a seção "Limitações".
+- **Comparar IMC × ITAE**: desenha as duas sintonias no mesmo gráfico, com o mesmo
+  SetPoint, o λ atual e a mesma opção de limite do motor.
+- **Rótulos no hover**: os valores de tr, ts e pico aparecem ao passar o mouse sobre
+  os pontos.
+- **Relatório em PDF** com identificação, sintonia atual e comparação dos métodos.
+- **Nota da ondulação do Padé** no gráfico, explicando que a oscilação inicial vem da
+  aproximação e não existe na planta.
 
 ## Resultados
 
@@ -167,19 +196,19 @@ Usamos o mesmo degrau do ensaio como SetPoint, de 0,117 para 1,009 bar.
 
 | Técnica | Método | Kp (%/bar) | Ti (s) | Td (s) | tr (s) | ts (s) | Mp (%) |
 |---|---|---|---|---|---|---|---|
-| 2 | IMC (λ = 3,0 s) | 186,04 | 10,850 | 1,106 | 6,01 | 12,75 | 0,00 |
-| 6 | ITAE | 220,68 | 12,670 | 0,847 | 2,33 | 19,39 | 0,43 |
+| 2 | IMC (λ = 3,0 s) | 186,04 | 10,850 | 1,106 | 5,74 | 12,88 | 0,00 |
+| 6 | ITAE | 220,68 | 12,670 | 0,847 | 2,20 | 19,39 | 0,19 |
 
 Para o IMC o método exige λ/θ > 0,8. Perto desse limite a resposta é mais rápida,
 mas aparece overshoot. Testamos alguns valores:
 
 | λ/θ | 0,85 | 1,0 | 1,2 | 1,5 | 2,0 |
 |---|---|---|---|---|---|
-| Mp (%) | 5,7 | 0,0 | 0,0 | 0,0 | 0,0 |
-| ts (s) | 10,6 | 11,0 | 12,8 | 16,1 | 20,8 |
+| Mp (%) | 9,2 | 0,0 | 0,0 | 0,0 | 0,0 |
+| ts (s) | 10,5 | 11,1 | 12,9 | 16,1 | 20,8 |
 
 Escolhemos λ = 1,2·θ = 3,0 s. A regra do método é ts ≈ 4λ, ou seja 12 s; o ts
-simulado foi 12,8 s. Com λ/θ = 1 o overshoot já some na simulação com Padé,
+simulado foi 12,9 s. Com λ/θ = 1 o overshoot já some na simulação com Padé,
 mas ainda aparece 0,69 % quando simulamos com o atraso. Com
 1,2 ele é zero nos dois casos, e subir mais que isso só deixa a resposta lenta.
 
@@ -189,14 +218,20 @@ mas ainda aparece 0,69 % quando simulamos com o atraso. Com
 
 ### Qual método atende melhor o critério
 
-O critério do grupo é o menor overshoot. Os dois métodos ficam abaixo de 1 %, mas o
-IMC é o mais adequado. Ele zera o overshoot com λ = 3,0 s, contra 0,43 % do ITAE, e
-o λ dá um controle direto sobre o compromisso entre velocidade e overshoot, o que
-permite deixar uma folga caso o modelo não esteja exato. De quebra, acomoda antes:
-12,8 s contra 19,4 s.
+O critério do grupo é o menor overshoot, e os dois métodos o atendem: o IMC fica em
+0,00 % e o ITAE em 0,19 %, praticamente zero nos dois casos (bem abaixo do ruído de
+2,5 % do próprio ensaio). Com o atraso exato no lugar do Padé, o ITAE vai a 0,32 % e o
+IMC continua em 0,00 %.
 
-O ITAE sobe mais rápido (2,3 s contra 6,0 s) porque usa um ganho maior. Por causa
-disso passa um pouco do SetPoint e depois demora para encostar no valor final.
+Ficamos com o IMC por dois motivos:
+
+- **Acomoda bem mais rápido:** 12,9 s contra 19,4 s do ITAE.
+- **O λ dá controle direto** sobre o compromisso entre velocidade e overshoot, o que
+  permite deixar uma folga caso o modelo não esteja exato. O ITAE não tem esse ajuste:
+  Kp, Ti e Td saem direto da regra.
+
+O ITAE sobe mais rápido (2,2 s contra 5,7 s) porque usa um ganho maior. Por causa
+disso encosta no SetPoint logo no início e depois demora para assentar no valor final.
 
 ![Comparação entre IMC e ITAE](resultados/figuras/06_comparacao_imc_itae.png)
 
@@ -208,10 +243,10 @@ A tabela acima usa o modelo de Smith, que é o resultado do método pedido. O aj
 
 | Modelo | Método | λ (s) | Kp (%/bar) | Ti (s) | Td (s) | tr (s) | ts (s) | Mp (%) |
 |---|---|---|---|---|---|---|---|---|
-| Smith | IMC | 3,00 | 186,04 | 10,850 | 1,106 | 6,01 | 12,75 | 0,00 |
-| Smith | ITAE | 3,00 | 220,68 | 12,670 | 0,847 | 2,33 | 19,39 | 0,43 |
-| Ajuste fino | IMC | 2,02 | 281,59 | 11,110 | 0,777 | 4,00 | 8,58 | 0,00 |
-| Ajuste fino | ITAE | 2,02 | 325,50 | 13,303 | 0,589 | 1,70 | 13,76 | 0,00 |
+| Smith | IMC | 3,00 | 186,04 | 10,850 | 1,106 | 5,74 | 12,88 | 0,00 |
+| Smith | ITAE | 3,00 | 220,68 | 12,670 | 0,847 | 2,20 | 19,39 | 0,19 |
+| Ajuste fino | IMC | 2,02 | 281,59 | 11,110 | 0,777 | 3,86 | 8,64 | 0,00 |
+| Ajuste fino | ITAE | 2,02 | 325,50 | 13,303 | 0,589 | 1,57 | 13,76 | 0,00 |
 
 No modelo refinado os dois métodos zeram o overshoot. O IMC continua acomodando antes (8,6 s contra 13,8 s), então a escolha do grupo não muda. O ganho sobe (281 e 325 %/bar): o comando do motor satura ainda mais no início, e a ressalva da simulação linear vale com mais força.
 
@@ -219,21 +254,33 @@ No modelo refinado os dois métodos zeram o overshoot. O IMC continua acomodando
 
 ## Limitações
 
-A biblioteca `control` não tem atraso de transporte, então usamos a aproximação de
-Padé que o enunciado indica, de 5ª ordem. Ela cria uma oscilação pequena nos
-primeiros 2,5 s da resposta que não existe no processo. Para saber quanto isso afeta
-os números, o `scripts/validar_pade.py` simula a mesma malha passo a passo com o
-atraso exato. Nas sintonias que usamos, tr e ts mudam menos de 0,3 s e o overshoot
-menos de 1 ponto percentual. Em sintonias mais agressivas a diferença cresce.
+A biblioteca `control` não tem atraso de transporte, então o atraso é representado
+pela aproximação de Padé de 10ª ordem, a mesma usada no código base da disciplina
+(`cnt.pade(theta, 10)`). Ela cria uma oscilação pequena nos primeiros 2,5 s da
+resposta que não existe no processo. Para saber quanto isso afeta os números, o
+`scripts/validar_pade.py` simula a mesma malha passo a passo com o atraso exato. Nas
+sintonias que usamos, tr e ts mudam menos de 0,05 s e o overshoot menos de 1 ponto
+percentual. Em sintonias mais agressivas a diferença cresce.
 
 ![Padé contra atraso exato](resultados/figuras/08_validacao_pade.png)
 
 A derivada pura não dá para simular, então o termo derivativo tem um filtro:
 Td·s/(Td/N·s + 1), com N = 10.
 
-A simulação é linear e não limita o motor. Com Kp perto de 200 %/bar, um degrau
-grande de SetPoint pede bem mais que 100 % do motor no começo. Na planta real ele
-saturaria e a subida seria mais lenta do que a simulada.
+A simulação usada nas tabelas é linear e não limita o motor. Com Kp perto de
+200 %/bar, o degrau de SetPoint pede bem mais que 100 % do motor no começo (MV máx
+de 1825 % no IMC e 2165 % no ITAE). Na planta real ele saturaria e a subida seria
+mais lenta. A opção "Limitar motor a 0–100 %" da interface simula isso:
+
+| Método | Simulação | tr (s) | ts (s) | Mp (%) |
+|---|---|---|---|---|
+| IMC | linear | 5,74 | 12,88 | 0,00 |
+| IMC | motor limitado | 12,09 | 28,45 | 0,00 |
+| ITAE | linear | 2,20 | 19,39 | 0,19 |
+| ITAE | motor limitado | 14,68 | 38,04 | 0,00 |
+
+Com o motor limitado as respostas ficam bem mais lentas, mas a escolha do grupo não
+muda: os dois continuam sem overshoot e o IMC acomoda antes.
 
 ## Estrutura do repositório
 
@@ -250,12 +297,15 @@ PP1-C13/
 │   ├── modelo.py           FOPDT, Padé, malha aberta e fechada
 │   ├── sintonia.py         regras de sintonia e função de transferência do PID
 │   ├── metricas.py         tr, ts e overshoot
-│   ├── simulacao.py        resposta da malha com PID
-│   └── graficos.py         desenho dos gráficos
+│   ├── simulacao.py        resposta da malha com PID (linear e com motor limitado)
+│   ├── graficos.py         desenho dos gráficos
+│   └── relatorio.py        relatório em PDF
 ├── gui/                    interface em PyQt5
 │   ├── janela_principal.py
+│   ├── aba_inicio.py
 │   ├── aba_identificacao.py
 │   ├── aba_controle.py
+│   ├── aba_relatorio.py
 │   └── widgets.py
 ├── scripts/                geram as tabelas e figuras deste README
 ├── tests/                  testes dos cálculos

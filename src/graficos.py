@@ -88,35 +88,83 @@ def figura_malhas(curvas: dict, titulo: str) -> Figure:
 # --------------------------------------------------------------------------- #
 def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "",
                       marcar=(), cor: str = CORES[0], grandeza: str = "Saída"):
-    """Resposta do controle: PV em cima, MV embaixo. `marcar` aceita 'tr', 'ts' e 'mp'."""
+    """Resposta do controle: PV em cima, MV embaixo. `marcar` aceita 'tr', 'ts' e 'mp'.
+
+    Devolve a lista de rótulos dos pontos marcados, como (anotação, [(x, y), ...]),
+    para a interface poder mostrá-los só quando o mouse passa sobre o ponto.
+    """
     q = resposta.metricas
+    destaques = []
     ax_pv.plot(resposta.t, resposta.pv, color=cor, linewidth=2, label="PV")
     ax_pv.axhline(resposta.sp, color=COR_REFERENCIA, linewidth=1, linestyle="--", label="SetPoint")
     estilizar(ax_pv, "" if ax_mv is not None else "Tempo (s)", rotulo_saida(unidade, grandeza), titulo)
-    legenda(ax_pv, loc="lower right")
+    # À direita, a meia altura: depois do transitório a curva fica colada no SetPoint
+    # (em cima ou embaixo), então essa região fica livre nos dois sentidos de degrau.
+    legenda(ax_pv, loc="center right")
 
     sufixo = f" {unidade}" if unidade else ""
-    linhas = []
+    # Num degrau de subida a curva continua para cima depois de cada ponto, então
+    # o lado de baixo fica livre; num degrau de descida é o contrário.
+    sentido = 1.0 if resposta.sp >= resposta.y_inicial else -1.0
+    t_meio = 0.5 * (resposta.t[0] + resposta.t[-1])
 
     def ponto(x, y):
         ax_pv.plot([x], [y], "o", markersize=6, color=cor, markeredgecolor="white",
                    markeredgewidth=1.2, zorder=5)
 
+    def rotulo(x, y, texto, y_texto, pontos):
+        """Rótulo ligado ao ponto (x, y), com o texto na altura `y_texto` (em dados).
+
+        A altura em dados, e não em pontos de tela, garante a mesma separação entre
+        rótulos vizinhos em qualquer tamanho de gráfico. `pontos` são os pontos que
+        acionam o rótulo no hover.
+        """
+        direita = x <= t_meio                  # na metade direita o texto vai para a esquerda
+        anotacao = ax_pv.annotate(texto, (x, y), xytext=(18 if direita else -18, y_texto),
+                       textcoords=("offset points", "data"), ha="left" if direita else "right",
+                       va="center", fontsize=8, color=COR_TEXTO, zorder=6,
+                       bbox=dict(boxstyle="round,pad=0.35", facecolor="white",
+                                 edgecolor=COR_GRADE, alpha=0.96),
+                       arrowprops=dict(arrowstyle="-", color=COR_TEXTO, linewidth=0.7,
+                                       shrinkA=0, shrinkB=4))
+        destaques.append((anotacao, pontos))
+
+    # A ondulação durante o tempo morto vem da aproximação de Padé; a simulação com
+    # o motor limitado usa o atraso exato e não tem esse efeito.
+    if not resposta.limitada and np.isfinite(q.t10):
+        ax_pv.annotate("ondulação inicial: efeito da aproximação de Padé,\nnão existe na planta real",
+                       (q.t10, resposta.y_inicial), xytext=(12, 0), textcoords="offset points",
+                       ha="left", va="bottom" if sentido > 0 else "top", fontsize=7.5,
+                       fontstyle="italic", color=COR_TEXTO)
+
+    # Subida e acomodação ficam no lado livre da curva, em degraus a partir da mesma
+    # referência (o nível de 90 %), para nunca se sobreporem; o pico fica do outro lado.
+    degrau = abs(resposta.sp - resposta.y_inicial)
+    base = resposta.y_inicial + 0.9 * (resposta.sp - resposta.y_inicial)
+    if "tr" in marcar and np.isfinite(q.tr):
+        y10 = float(np.interp(q.t10, resposta.t, resposta.pv))
+        y90 = float(np.interp(q.t90, resposta.t, resposta.pv))
+        ponto(q.t10, y10)
+        ponto(q.t90, y90)
+        rotulo(q.t90, y90, f"Subida: {q.tr:.2f} s", base - sentido * 0.17 * degrau,
+               [(q.t10, y10), (q.t90, y90)])
+        destaques[-1][0].set_zorder(7)   # acima da linha de ligação da acomodação
+    if "ts" in marcar and np.isfinite(q.ts):
+        y_ts = float(np.interp(q.ts, resposta.t, resposta.pv))
+        ponto(q.ts, y_ts)
+        rotulo(q.ts, y_ts, f"Acomodação: {q.ts:.2f} s", base - sentido * 0.33 * degrau,
+               [(q.ts, y_ts)])
     if "mp" in marcar and np.isfinite(q.mp):
         ponto(q.t_pico, q.pico)
-        linhas.append(f"Pico  {q.pico:.4g}{sufixo}    overshoot  {q.mp:.2f} %")
-    if "tr" in marcar and np.isfinite(q.tr):
-        ponto(q.t10, float(np.interp(q.t10, resposta.t, resposta.pv)))
-        ponto(q.t90, float(np.interp(q.t90, resposta.t, resposta.pv)))
-        linhas.append(f"Subida 10–90 %    {q.tr:.2f} s")
-    if "ts" in marcar and np.isfinite(q.ts):
-        ponto(q.ts, float(np.interp(q.ts, resposta.t, resposta.pv)))
-        linhas.append(f"Acomodação 2 %    {q.ts:.2f} s")
-    if linhas:
-        ax_pv.text(0.98, 0.05, "\n".join(linhas), transform=ax_pv.transAxes,
-                   ha="right", va="bottom", fontsize=8, color=COR_TEXTO, linespacing=1.5,
-                   bbox=dict(boxstyle="round,pad=0.45", facecolor="white",
-                             edgecolor=COR_GRADE, alpha=0.96), zorder=6)
+        rotulo(q.t_pico, q.pico, f"Pico: {q.pico:.4g}{sufixo} / Overshoot: {q.mp:.2f} %",
+               q.pico + sentido * 0.12 * degrau, [(q.t_pico, q.pico)])
+        # Folga no lado do pico para o rótulo não sair do gráfico nem cobrir o título.
+        baixo, alto = ax_pv.get_ylim()
+        folga = 0.25 * degrau
+        if sentido > 0:
+            ax_pv.set_ylim(baixo, max(alto, q.pico + folga))
+        else:
+            ax_pv.set_ylim(min(baixo, q.pico - folga), alto)
 
     if ax_mv is not None:
         ax_mv.plot(resposta.t, resposta.mv, color=cor, linewidth=1.5, label="MV")
@@ -129,6 +177,7 @@ def desenhar_controle(ax_pv, ax_mv, resposta, titulo: str = "", unidade: str = "
         estilizar(ax_mv, "Tempo (s)", "MV (%)")
         ax_mv.annotate("limites do atuador", (resposta.t[-1], MV_MAX), xytext=(0, 3),
                        textcoords="offset points", ha="right", fontsize=8, color=COR_TEXTO)
+    return destaques
 
 
 def figura_controle(resposta, titulo: str, unidade: str = "", marcar=("tr", "ts", "mp"),
@@ -139,20 +188,36 @@ def figura_controle(resposta, titulo: str, unidade: str = "", marcar=("tr", "ts"
     return fig
 
 
-def figura_comparacao(respostas: dict, titulo: str, unidade: str = "", t_max: float | None = None,
-                      grandeza: str = "Saída") -> Figure:
-    """Várias sintonias no mesmo gráfico. `respostas` = {nome: RespostaControle}."""
-    fig = Figure(figsize=(9, 5), layout="constrained")
-    ax = fig.add_subplot()
+def desenhar_comparacao(ax, respostas: dict, titulo: str = "", unidade: str = "",
+                        t_max: float | None = None, grandeza: str = "Saída", ax_mv=None):
+    """Várias sintonias no mesmo eixo. `respostas` = {nome: RespostaControle}.
+
+    Com `ax_mv`, desenha também o sinal de controle de cada sintonia.
+    """
     primeira = next(iter(respostas.values()))
     for cor, (nome, r) in zip(CORES, respostas.items()):
         ax.plot(r.t, r.pv, color=cor, linewidth=2,
                 label=f"{nome} (Mp = {r.metricas.mp:.1f} %, ts = {r.metricas.ts:.1f} s)")
+        if ax_mv is not None:
+            ax_mv.plot(r.t, r.mv, color=cor, linewidth=1.5)
     ax.axhline(primeira.sp, color=COR_REFERENCIA, linewidth=1, linestyle="--", label="SetPoint")
     if t_max is not None:
         ax.set_xlim(0, t_max)
-    estilizar(ax, "Tempo (s)", rotulo_saida(unidade, grandeza), titulo)
+    estilizar(ax, "Tempo (s)" if ax_mv is None else "", rotulo_saida(unidade, grandeza), titulo)
     legenda(ax, loc="lower right")
+    if ax_mv is not None:
+        for limite in (MV_MIN, MV_MAX):
+            ax_mv.axhline(limite, color=COR_REFERENCIA, linewidth=1, linestyle=":")
+        folga = 0.25 * (MV_MAX - MV_MIN)
+        ax_mv.set_ylim(MV_MIN - folga, MV_MAX + folga)
+        estilizar(ax_mv, "Tempo (s)", "MV (%)")
+
+
+def figura_comparacao(respostas: dict, titulo: str, unidade: str = "", t_max: float | None = None,
+                      grandeza: str = "Saída") -> Figure:
+    """Várias sintonias no mesmo gráfico. `respostas` = {nome: RespostaControle}."""
+    fig = Figure(figsize=(9, 5), layout="constrained")
+    desenhar_comparacao(fig.add_subplot(), respostas, titulo, unidade, t_max, grandeza)
     return fig
 
 

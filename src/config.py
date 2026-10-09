@@ -3,6 +3,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+# Identificação do trabalho, usada na interface e no relatório em PDF
+TITULO = "Projeto Prático C213 - Sistemas Embarcados"
+SUBTITULO = "Identificação de Processos & Sintonia de Controladores PID"
+INTEGRANTES = ("Pedro Paulo de Paiva Junqueira",
+               "Leandro Teixeira Ambrósio",
+               "Luiz Augusto Moreira Barbosa")
+
 # Caminhos sempre relativos à raiz do projeto, para funcionar de qualquer pasta.
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_DADOS = RAIZ / "data"
@@ -14,7 +21,7 @@ JANELA_SUAVIZACAO = 9      # amostras da média móvel usada para achar os cruza
 FRACAO_REGIME = 0.10       # fração final das amostras usada para estimar o valor final
 
 # Simulação
-ORDEM_PADE = 5             # ordem da aproximação de Padé do atraso
+ORDEM_PADE = 10            # ordem da aproximação de Padé do atraso (igual ao código base da disciplina)
 N_FILTRO_DERIVADA = 10     # filtro da ação derivativa: Td*s / (Td/N*s + 1)
 BANDA_ACOMODACAO = 0.02    # critério dos 2 %
 
