@@ -12,10 +12,7 @@ from PyQt5.QtWidgets import (QFileDialog, QFrame, QLabel, QLineEdit, QSizePolicy
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
 
-from src.config import PASTA_FIGURAS
-
-TITULO = "Projeto Prático C213 - Sistemas Embarcados"
-SUBTITULO = "Identificação de Processos & Sintonia de Controladores PID"
+from src.config import PASTA_FIGURAS, SUBTITULO, TITULO  # noqa: F401 (reexportados para as abas)
 
 # Rótulos no hover: distância do mouse ao ponto e animação de aparecer/sumir.
 RAIO_HOVER_PX = 15

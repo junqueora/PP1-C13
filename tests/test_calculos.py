@@ -3,12 +3,13 @@
 Execute a partir da raiz do projeto:  python -m pytest
 """
 import math
+import re
 
 import numpy as np
 import pytest
 from scipy.io import savemat
 
-from src import graficos, identificacao, metricas, simulacao, sintonia
+from src import graficos, identificacao, metricas, relatorio, simulacao, sintonia
 from src.config import DATASET_PADRAO
 from src.dataset import Dataset, carregar
 from src.modelo import ModeloFOPDT
@@ -169,6 +170,45 @@ def test_setpoint_inalcancavel_para_no_limite_do_motor():
     teto = 0.12 + m.k * 100.0
     assert r.metricas.valor_final == pytest.approx(teto)
     assert r.pv[-1] == pytest.approx(teto, abs=1e-3)
+
+
+def dados_relatorio(theta=2.5, com_sintonia=True):
+    ds = carregar(DATASET_PADRAO)
+    resultados = identificacao.identificar(ds)
+    m = ModeloFOPDT(0.013723, 9.6, theta)
+    pid = sintonia.PID(50.0, 10.0, 0.0)
+    resposta = simulacao.simular_controle(m, pid, ds.yf, ds.y0) if com_sintonia else None
+    return relatorio.DadosRelatorio(ds, resultados, "Smith", m, ds.yf, 3.0, resposta, pid,
+                                    "Sintonia manual")
+
+
+@pytest.mark.parametrize("secoes, paginas", [
+    (("identificacao", "controle", "comparacao"), 3),
+    (("comparacao",), 1),
+    ((), 0),
+])
+def test_relatorio_tem_uma_pagina_por_secao(secoes, paginas):
+    assert len(relatorio.paginas(dados_relatorio(), secoes)) == paginas
+
+
+def test_relatorio_omite_controle_sem_sintonia_valida():
+    assert len(relatorio.paginas(dados_relatorio(com_sintonia=False))) == 2
+
+
+def test_relatorio_gera_pdf_valido(tmp_path):
+    destino = tmp_path / "relatorio.pdf"
+    relatorio.salvar_pdf(destino, relatorio.paginas(dados_relatorio()))
+    conteudo = destino.read_bytes()
+    assert conteudo.startswith(b"%PDF")
+    assert len(re.findall(rb"/Type\s*/Page(?!s)", conteudo)) == 3   # páginas, sem o nó /Pages
+
+
+def test_relatorio_com_theta_zero_nao_quebra():
+    """Sem atraso as regras de sintonia não se aplicam; a tabela mostra o motivo."""
+    figuras = relatorio.paginas(dados_relatorio(theta=0.0), ("comparacao",))
+    textos = [t.get_text() for ax in figuras[0].axes for t in ax.texts] + \
+             [t.get_text() for t in figuras[0].texts]
+    assert any("IMC × ITAE" in t for t in textos)
 
 
 @pytest.mark.parametrize("marcar, esperados", [

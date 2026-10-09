@@ -19,6 +19,7 @@ class AbaControle(QWidget):
         pintar(self)
         self.ds = None
         self.modelo = None
+        self.identificacao = None
         self.resposta = None
         self.pid = None          # última sintonia simulada, para refazer ao mudar opções
         self.titulo_base = ""
@@ -214,6 +215,7 @@ class AbaControle(QWidget):
         """Recebe o dataset e o modelo escolhidos na aba Identificação."""
         novo_dataset = ds is not self.ds
         self.ds, self.modelo = ds, identificacao.modelo
+        self.identificacao = identificacao
         self.rotulo_modelo.setText(f"{identificacao.metodo}    ·    {identificacao.modelo}")
         self.rotulo_modelo.setVisible(True)
         if ds.unidade:
@@ -410,21 +412,11 @@ class AbaControle(QWidget):
     def _respostas_comparacao(self) -> dict:
         """IMC e ITAE com o SetPoint atual e a mesma opção de limite do motor.
 
-        O IMC usa o λ do campo; se ele for inválido, volta para λ = 1,2·θ. Levanta
-        ValueError quando as regras não se aplicam (θ = 0) ou a malha é instável.
+        Levanta ValueError quando as regras não se aplicam (θ = 0) ou a malha é instável.
         """
-        lam = self.campo_lambda.valor()
-        try:
-            imc = sintonia.sintonizar("IMC", self.modelo, lam)
-        except ValueError:
-            lam = RAZAO_LAMBDA_PADRAO * self.modelo.theta
-            imc = sintonia.sintonizar("IMC", self.modelo, lam)
-        simular = (simulacao.simular_controle_saturado if self.resposta.limitada
-                   else simulacao.simular_controle)
-        sintonias = {f"IMC (λ = {lam:.3g} s)": imc,
-                     "ITAE": sintonia.sintonizar("ITAE", self.modelo)}
-        return {nome: simular(self.modelo, pid, self.resposta.sp, self.ds.y0, self.ds.u0)
-                for nome, pid in sintonias.items()}
+        return simulacao.comparar_imc_itae(self.modelo, self.campo_lambda.valor(),
+                                           self.resposta.sp, self.ds.y0, self.ds.u0,
+                                           self.resposta.limitada)
 
     def _sem_resultado(self, mensagem: str, papel: str = "alerta"):
         """Apaga o gráfico e as métricas quando não há uma sintonia válida."""

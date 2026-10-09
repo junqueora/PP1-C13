@@ -1,4 +1,4 @@
-"""Janela principal: reúne as abas Início, Identificação e Controle PID."""
+"""Janela principal: reúne as abas Início, Identificação, Controle PID e Relatório."""
 from __future__ import annotations
 
 from PyQt5.QtCore import Qt
@@ -7,7 +7,9 @@ from PyQt5.QtWidgets import QLabel, QMainWindow, QTabWidget, QVBoxLayout, QWidge
 from gui.aba_controle import AbaControle
 from gui.aba_identificacao import AbaIdentificacao
 from gui.aba_inicio import AbaInicio
+from gui.aba_relatorio import AbaRelatorio
 from gui.widgets import SUBTITULO, TITULO, pintar
+from src.relatorio import DadosRelatorio
 
 
 class JanelaPrincipal(QMainWindow):
@@ -46,8 +48,11 @@ class JanelaPrincipal(QMainWindow):
         self.abas.addTab(self.aba_inicio, "Início")
         self.indice_identificacao = self.abas.addTab(self.aba_identificacao, "Identificação")
         self.indice_controle = self.abas.addTab(self.aba_controle, "Controle PID")
-        # A aba de controle só é liberada depois que um dataset válido é selecionado.
+        self.aba_relatorio = AbaRelatorio(self._dados_relatorio)
+        self.indice_relatorio = self.abas.addTab(self.aba_relatorio, "Relatório")
+        # Controle e relatório só são liberados depois que um dataset válido é selecionado.
         self.abas.setTabEnabled(self.indice_controle, False)
+        self.abas.setTabEnabled(self.indice_relatorio, False)
         self.abas.setElideMode(Qt.ElideNone)
 
         coluna.addWidget(barra)
@@ -57,7 +62,27 @@ class JanelaPrincipal(QMainWindow):
         self.aba_inicio.comecar.connect(
             lambda: self.abas.setCurrentIndex(self.indice_identificacao))
         self.aba_identificacao.modelo_definido.connect(self._ao_definir_modelo)
+        self.abas.currentChanged.connect(self._ao_trocar_aba)
 
     def _ao_definir_modelo(self, ds, identificacao):
         self.aba_controle.definir_modelo(ds, identificacao)
         self.abas.setTabEnabled(self.indice_controle, True)
+        self.abas.setTabEnabled(self.indice_relatorio, True)
+
+    def _ao_trocar_aba(self, indice: int):
+        # A prévia é refeita ao abrir a aba, para refletir o estado atual das outras.
+        if indice == self.indice_relatorio:
+            self.aba_relatorio.atualizar()
+
+    def _dados_relatorio(self) -> DadosRelatorio | None:
+        """Estado atual das abas Identificação e Controle, no formato do relatório."""
+        ident, controle = self.aba_identificacao, self.aba_controle
+        if ident.ds is None or controle.identificacao is None:
+            return None
+        resposta = controle.resposta
+        sp = resposta.sp if resposta is not None else (controle.campo_sp.valor() or ident.ds.yf)
+        return DadosRelatorio(
+            ds=ident.ds, resultados=ident.resultados,
+            metodo_modelo=controle.identificacao.metodo, modelo=controle.modelo, sp=sp,
+            lam=controle.campo_lambda.valor(), resposta=resposta, pid=controle.pid,
+            titulo_controle=controle.titulo, limitada=controle.marca_limitar.isChecked())

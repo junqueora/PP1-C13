@@ -70,7 +70,7 @@ python -m pytest                        # testes dos cálculos
 
 ## Usando a interface
 
-A janela tem três abas.
+A janela tem quatro abas.
 
 **Início** apresenta o projeto, o grupo, a planta, os métodos escolhidos e um passo a
 passo de uso. O botão "Começar" leva para a aba Identificação.
@@ -96,6 +96,12 @@ aviso de status compara o ts simulado com 4λ. As caixinhas ao lado de tr, ts e 
 marcam esses pontos no gráfico. O rótulo com o valor de cada ponto aparece quando o
 mouse passa sobre ele. "Exportar" salva a figura, já com todos os rótulos visíveis.
 
+A aba **Relatório** é liberada junto com a de controle. Ela monta um PDF em A4 com o
+que está selecionado nas outras abas: identificação (tabela dos métodos e curva de
+reação), sintonia atual (parâmetros, métricas e resposta) e comparação dos métodos
+(tabela dos seis métodos e gráfico IMC × ITAE). Dá para escolher as seções, ver a
+prévia de cada página e clicar em "Gerar PDF".
+
 ## Extras da interface
 
 Além do que o enunciado pede, a interface tem:
@@ -111,6 +117,9 @@ Além do que o enunciado pede, a interface tem:
   exato. Mostra a resposta realista; ver a seção "Limitações".
 - **Comparar IMC × ITAE**: desenha as duas sintonias no mesmo gráfico, com o mesmo
   SetPoint, o λ atual e a mesma opção de limite do motor.
+- **Rótulos no hover**: os valores de tr, ts e pico aparecem ao passar o mouse sobre
+  os pontos.
+- **Relatório em PDF** com identificação, sintonia atual e comparação dos métodos.
 - **Nota da ondulação do Padé** no gráfico, explicando que a oscilação inicial vem da
   aproximação e não existe na planta.
 
@@ -289,12 +298,14 @@ PP1-C13/
 │   ├── sintonia.py         regras de sintonia e função de transferência do PID
 │   ├── metricas.py         tr, ts e overshoot
 │   ├── simulacao.py        resposta da malha com PID (linear e com motor limitado)
-│   └── graficos.py         desenho dos gráficos
+│   ├── graficos.py         desenho dos gráficos
+│   └── relatorio.py        relatório em PDF
 ├── gui/                    interface em PyQt5
 │   ├── janela_principal.py
 │   ├── aba_inicio.py
 │   ├── aba_identificacao.py
 │   ├── aba_controle.py
+│   ├── aba_relatorio.py
 │   └── widgets.py
 ├── scripts/                geram as tabelas e figuras deste README
 ├── tests/                  testes dos cálculos

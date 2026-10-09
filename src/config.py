@@ -3,6 +3,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+# Identificação do trabalho, usada na interface e no relatório em PDF
+TITULO = "Projeto Prático C213 - Sistemas Embarcados"
+SUBTITULO = "Identificação de Processos & Sintonia de Controladores PID"
+INTEGRANTES = ("Pedro Paulo de Paiva Junqueira",
+               "Leandro Teixeira Ambrósio",
+               "Luiz Augusto Moreira Barbosa")
+
 # Caminhos sempre relativos à raiz do projeto, para funcionar de qualquer pasta.
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_DADOS = RAIZ / "data"
