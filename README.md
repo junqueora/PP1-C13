@@ -170,19 +170,19 @@ Usamos o mesmo degrau do ensaio como SetPoint, de 0,117 para 1,009 bar.
 
 | Técnica | Método | Kp (%/bar) | Ti (s) | Td (s) | tr (s) | ts (s) | Mp (%) |
 |---|---|---|---|---|---|---|---|
-| 2 | IMC (λ = 3,0 s) | 186,04 | 10,850 | 1,106 | 6,01 | 12,75 | 0,00 |
-| 6 | ITAE | 220,68 | 12,670 | 0,847 | 2,33 | 19,39 | 0,43 |
+| 2 | IMC (λ = 3,0 s) | 186,04 | 10,850 | 1,106 | 5,74 | 12,88 | 0,00 |
+| 6 | ITAE | 220,68 | 12,670 | 0,847 | 2,20 | 19,39 | 0,19 |
 
 Para o IMC o método exige λ/θ > 0,8. Perto desse limite a resposta é mais rápida,
 mas aparece overshoot. Testamos alguns valores:
 
 | λ/θ | 0,85 | 1,0 | 1,2 | 1,5 | 2,0 |
 |---|---|---|---|---|---|
-| Mp (%) | 5,7 | 0,0 | 0,0 | 0,0 | 0,0 |
-| ts (s) | 10,6 | 11,0 | 12,8 | 16,1 | 20,8 |
+| Mp (%) | 9,2 | 0,0 | 0,0 | 0,0 | 0,0 |
+| ts (s) | 10,5 | 11,1 | 12,9 | 16,1 | 20,8 |
 
 Escolhemos λ = 1,2·θ = 3,0 s. A regra do método é ts ≈ 4λ, ou seja 12 s; o ts
-simulado foi 12,8 s. Com λ/θ = 1 o overshoot já some na simulação com Padé,
+simulado foi 12,9 s. Com λ/θ = 1 o overshoot já some na simulação com Padé,
 mas ainda aparece 0,69 % quando simulamos com o atraso. Com
 1,2 ele é zero nos dois casos, e subir mais que isso só deixa a resposta lenta.
 
@@ -211,10 +211,10 @@ A tabela acima usa o modelo de Smith, que é o resultado do método pedido. O aj
 
 | Modelo | Método | λ (s) | Kp (%/bar) | Ti (s) | Td (s) | tr (s) | ts (s) | Mp (%) |
 |---|---|---|---|---|---|---|---|---|
-| Smith | IMC | 3,00 | 186,04 | 10,850 | 1,106 | 6,01 | 12,75 | 0,00 |
-| Smith | ITAE | 3,00 | 220,68 | 12,670 | 0,847 | 2,33 | 19,39 | 0,43 |
-| Ajuste fino | IMC | 2,02 | 281,59 | 11,110 | 0,777 | 4,00 | 8,58 | 0,00 |
-| Ajuste fino | ITAE | 2,02 | 325,50 | 13,303 | 0,589 | 1,70 | 13,76 | 0,00 |
+| Smith | IMC | 3,00 | 186,04 | 10,850 | 1,106 | 5,74 | 12,88 | 0,00 |
+| Smith | ITAE | 3,00 | 220,68 | 12,670 | 0,847 | 2,20 | 19,39 | 0,19 |
+| Ajuste fino | IMC | 2,02 | 281,59 | 11,110 | 0,777 | 3,86 | 8,64 | 0,00 |
+| Ajuste fino | ITAE | 2,02 | 325,50 | 13,303 | 0,589 | 1,57 | 13,76 | 0,00 |
 
 No modelo refinado os dois métodos zeram o overshoot. O IMC continua acomodando antes (8,6 s contra 13,8 s), então a escolha do grupo não muda. O ganho sobe (281 e 325 %/bar): o comando do motor satura ainda mais no início, e a ressalva da simulação linear vale com mais força.
 
@@ -222,12 +222,13 @@ No modelo refinado os dois métodos zeram o overshoot. O IMC continua acomodando
 
 ## Limitações
 
-A biblioteca `control` não tem atraso de transporte, então usamos a aproximação de
-Padé que o enunciado indica, de 5ª ordem. Ela cria uma oscilação pequena nos
-primeiros 2,5 s da resposta que não existe no processo. Para saber quanto isso afeta
-os números, o `scripts/validar_pade.py` simula a mesma malha passo a passo com o
-atraso exato. Nas sintonias que usamos, tr e ts mudam menos de 0,3 s e o overshoot
-menos de 1 ponto percentual. Em sintonias mais agressivas a diferença cresce.
+A biblioteca `control` não tem atraso de transporte, então o atraso é representado
+pela aproximação de Padé de 10ª ordem, a mesma usada no código base da disciplina
+(`cnt.pade(theta, 10)`). Ela cria uma oscilação pequena nos primeiros 2,5 s da
+resposta que não existe no processo. Para saber quanto isso afeta os números, o
+`scripts/validar_pade.py` simula a mesma malha passo a passo com o atraso exato. Nas
+sintonias que usamos, tr e ts mudam menos de 0,05 s e o overshoot menos de 1 ponto
+percentual. Em sintonias mais agressivas a diferença cresce.
 
 ![Padé contra atraso exato](resultados/figuras/08_validacao_pade.png)
 
