@@ -5,10 +5,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (QFrame, QGridLayout, QHBoxLayout, QLabel, QPushButton,
                              QScrollArea, QVBoxLayout, QWidget)
 
-from gui.widgets import cartao, pintar
-
-TITULO = "Projeto Prático C213 - Sistemas Embarcados"
-SUBTITULO = "Identificação de Processos & Sintonia de Controladores PID"
+from gui.widgets import SUBTITULO, TITULO, cartao, pintar
 
 INTEGRANTES = ("Pedro Paulo de Paiva Junqueira",
                "Leandro Teixeira Ambrósio",

@@ -13,8 +13,8 @@ from matplotlib.figure import Figure
 
 from src.config import PASTA_FIGURAS
 
-TITULO = "Projeto prático C13"
-SUBTITULO = "Identificação de processos e sintonia de controladores PID"
+TITULO = "Projeto Prático C213 - Sistemas Embarcados"
+SUBTITULO = "Identificação de Processos & Sintonia de Controladores PID"
 
 
 def pintar(widget):

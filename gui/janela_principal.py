@@ -13,7 +13,7 @@ from gui.widgets import SUBTITULO, TITULO, pintar
 class JanelaPrincipal(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("PP1-C13  ·  Sintonia de PID")
+        self.setWindowTitle(TITULO)
         self.resize(1240, 820)
         self.setMinimumSize(980, 680)
 
