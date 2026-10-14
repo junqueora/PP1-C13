@@ -14,6 +14,13 @@ _NOMES_TEMPO = ("t", "tempo", "time")
 _NOMES_ENTRADA = ("degrau", "entrada", "u", "step")
 _NOMES_SAIDA = ("saida", "saída", "y", "output")
 
+# Grandeza física deduzida da unidade, quando o arquivo não informa (comparação sem maiúsculas).
+_GRANDEZA_POR_UNIDADE = {
+    **dict.fromkeys(("bar", "mbar", "pa", "kpa", "mpa", "psi", "atm", "mmhg"), "Pressão"),
+    **dict.fromkeys(("°c", "ºc", "k"), "Temperatura"),
+    **dict.fromkeys(("rpm", "rad/s"), "Velocidade"),
+}
+
 
 @dataclass(frozen=True)
 class Dataset:
@@ -23,6 +30,7 @@ class Dataset:
     u: np.ndarray
     y: np.ndarray
     unidade: str = ""
+    grandeza: str = "Saída"          # nome da variável medida, usado no eixo dos gráficos
     descricao: str = ""
     nome: str = ""
     referencia: dict | None = None   # parâmetros de referência, se o arquivo trouxer
@@ -107,9 +115,14 @@ def carregar(caminho) -> Dataset:
     if parametros is not None and hasattr(parametros, "_fieldnames"):
         referencia = {campo: float(getattr(parametros, campo)) for campo in parametros._fieldnames}
 
+    unidade = str(conteudo.get("unidade_saida", "")).strip()
+    grandeza = (str(conteudo.get("grandeza_saida", "")).strip()
+                or _GRANDEZA_POR_UNIDADE.get(unidade.lower(), "Saída"))
+
     ds = Dataset(
         t=t, u=u, y=y,
-        unidade=str(conteudo.get("unidade_saida", "")).strip(),
+        unidade=unidade,
+        grandeza=grandeza,
         descricao=str(conteudo.get("descricao", "")).strip(),
         nome=caminho.name,
         referencia=referencia,

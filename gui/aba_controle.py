@@ -19,7 +19,10 @@ class AbaControle(QWidget):
         pintar(self)
         self.ds = None
         self.modelo = None
+        self.identificacao = None
         self.resposta = None
+        self.pid = None          # última sintonia simulada, para refazer ao mudar opções
+        self.titulo_base = ""
         self.titulo = ""
 
         # --- seleção da forma de sintonia ---------------------------------
@@ -52,10 +55,26 @@ class AbaControle(QWidget):
         self.rotulo_regra = QLabel("Regra")
         self.rotulo_regra.setObjectName("campo")
 
+        # --- opções de simulação ----------------------------------------------
+        self.marca_limitar = QCheckBox("Limitar motor a 0–100 %")
+        self.marca_limitar.setCursor(Qt.PointingHandCursor)
+        self.marca_limitar.setToolTip("Simula com o comando do motor saturado na faixa física "
+                                      "do atuador (com anti-windup e atraso exato).")
+        self.marca_limitar.toggled.connect(self._ressimular)
+        self.botao_comparar = QPushButton("Comparar IMC × ITAE")
+        self.botao_comparar.setCheckable(True)
+        self.botao_comparar.setCursor(Qt.PointingHandCursor)
+        self.botao_comparar.setToolTip("Mostra as respostas do IMC e do ITAE no mesmo gráfico, "
+                                       "com o mesmo SetPoint.")
+        self.botao_comparar.toggled.connect(self._redesenhar)
+
         topo = QHBoxLayout()
         topo.setSpacing(12)
         topo.addWidget(segmento)
         topo.addStretch(1)
+        topo.addWidget(self.marca_limitar)
+        topo.addWidget(self.botao_comparar)
+        topo.addSpacing(12)
         topo.addWidget(self.rotulo_regra)
         topo.addWidget(self.combo_metodo)
 
@@ -132,9 +151,9 @@ class AbaControle(QWidget):
         metricas.addWidget(self.campo_sp, 0, 1)
         self.marcas = {}
         dicas = {
-            "tr": "Marcar o tempo de subida no gráfico",
-            "ts": "Marcar o tempo de acomodação no gráfico",
-            "mp": "Marcar o pico e o overshoot no gráfico",
+            "tr": "Marcar o tempo de subida no gráfico (passe o mouse no ponto para ver o valor)",
+            "ts": "Marcar o tempo de acomodação no gráfico (passe o mouse no ponto para ver o valor)",
+            "mp": "Marcar o pico e o overshoot no gráfico (passe o mouse no ponto para ver o valor)",
         }
         for linha, (chave, texto, campo) in enumerate(
                 [("tr", "tr (s)", self.campo_tr), ("ts", "ts (s)", self.campo_ts),
@@ -196,6 +215,7 @@ class AbaControle(QWidget):
         """Recebe o dataset e o modelo escolhidos na aba Identificação."""
         novo_dataset = ds is not self.ds
         self.ds, self.modelo = ds, identificacao.modelo
+        self.identificacao = identificacao
         self.rotulo_modelo.setText(f"{identificacao.metodo}    ·    {identificacao.modelo}")
         self.rotulo_modelo.setVisible(True)
         if ds.unidade:
@@ -230,9 +250,10 @@ class AbaControle(QWidget):
         self.campo_lambda.travar(not imc)              # λ só existe no método IMC
         self.campo_lambda.setEnabled(imc)
         self.botoes_limpar[self.campo_lambda].setVisible(imc)
-        self.botao_sintonizar.setVisible(not metodo)
-        self.botao_sintonizar.setEnabled(self.modelo is not None)
+        # Sempre visível; no modo Método os valores vêm da regra, então fica desabilitado.
+        self.botao_sintonizar.setEnabled(not metodo and self.modelo is not None)
         self.botao_exportar.setEnabled(self.resposta is not None)
+        self.botao_comparar.setEnabled(self.resposta is not None)
 
     def _ao_trocar_modo(self):
         self._atualizar_estado()
@@ -300,7 +321,13 @@ class AbaControle(QWidget):
             self._sem_resultado("Malha fechada instável para estes parâmetros. "
                                 "Reduza Kp ou aumente Ti.", "erro")
             return
-        self.resposta = simulacao.simular_controle(self.modelo, pid, sp, self.ds.y0, self.ds.u0)
+        self.pid, self.titulo_base = pid, titulo
+        if self.marca_limitar.isChecked():
+            self.resposta = simulacao.simular_controle_saturado(
+                self.modelo, pid, sp, self.ds.y0, self.ds.u0)
+            titulo += "  ·  motor limitado"
+        else:
+            self.resposta = simulacao.simular_controle(self.modelo, pid, sp, self.ds.y0, self.ds.u0)
         self.titulo = titulo
         q = self.resposta.metricas
         self.campo_tr.definir(q.tr, ".2f")
@@ -310,10 +337,11 @@ class AbaControle(QWidget):
         self.campo_erro.definir(round(q.erro_regime, 9) + 0.0, ".3g")
         self.campo_mv.definir(self.resposta.mv_max, ".0f")
         self.campo_mv.marcar_alerta(self.resposta.satura)
-        self._redesenhar()
         ok, alerta = self._mensagens()
         definir_aviso(self.rotulo_status, ok, "ok")
         definir_aviso(self.rotulo_alerta, alerta, "alerta")
+        # Depois dos avisos: se a comparação falhar, o aviso dela não é sobrescrito.
+        self._redesenhar()
         self._atualizar_estado()
 
     def _mensagens(self) -> tuple[str, str]:
@@ -323,16 +351,28 @@ class AbaControle(QWidget):
             ts = self.resposta.metricas.ts
             if lam and ts == ts:
                 ok += f"  Regra do IMC: ts ≈ 4λ = {4 * lam:.2f} s (simulado {ts:.2f} s)."
-        mv_final = float(self.resposta.mv[-1])
+        # Motor necessário em regime: vem do ganho do modelo, vale com ou sem limite.
+        mv_final = self.ds.u0 + (self.resposta.sp - self.ds.y0) / self.modelo.k
+        r = self.resposta
         if not (MV_MIN <= mv_final <= MV_MAX):
             alerta = (f"Este SetPoint exige {mv_final:.0f} % do motor em regime, fora da faixa "
                       f"de {MV_MIN:g} a {MV_MAX:g} %. Não é alcançável na planta real.")
+        elif r.limitada:
+            no_limite = (r.mv >= MV_MAX) | (r.mv <= MV_MIN)
+            tempo = float(no_limite.sum() * (r.t[1] - r.t[0]))
+            alerta = (f"Motor limitado a {MV_MIN:g}–{MV_MAX:g} %: ficou {tempo:.1f} s no limite. "
+                      "Simulação com atraso exato e anti-windup." if tempo > 0 else "")
         elif self.resposta.satura:
             alerta = (f"O comando passa de {MV_MIN:g}–{MV_MAX:g} % no transitório. "
                       "A simulação não limita o motor; na planta a subida seria mais lenta.")
         else:
             alerta = ""
         return ok, alerta
+
+    def _ressimular(self):
+        """Refaz a última simulação válida, por exemplo ao ligar o limite do motor."""
+        if self.pid is not None and self.resposta is not None:
+            self._simular(self.pid, self.titulo_base)
 
     def _publicar(self, texto: str, papel: str):
         definir_aviso(self.rotulo_status, texto, papel)
@@ -344,15 +384,48 @@ class AbaControle(QWidget):
     def _redesenhar(self):
         if self.resposta is None:
             return
+        comparacao = None
+        if self.botao_comparar.isChecked():
+            # Calculada antes de limpar a figura: se falhar, o gráfico atual continua.
+            try:
+                comparacao = self._respostas_comparacao()
+            except ValueError as erro:
+                self.botao_comparar.blockSignals(True)
+                self.botao_comparar.setChecked(False)
+                self.botao_comparar.blockSignals(False)
+                definir_aviso(self.rotulo_alerta, f"Não foi possível comparar IMC × ITAE: {erro}",
+                              "alerta")
         self.grafico.figura.clear()
         ax_pv, ax_mv = self.grafico.figura.subplots(2, 1, sharex=True, height_ratios=[3, 1.2])
-        marcar = [chave for chave, marca in self.marcas.items() if marca.isChecked()]
-        graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo, self.ds.unidade, marcar)
+        if comparacao is not None:
+            titulo = "IMC × ITAE" + ("  ·  motor limitado" if self.resposta.limitada else "")
+            graficos.desenhar_comparacao(ax_pv, comparacao, titulo, self.ds.unidade,
+                                         grandeza=self.ds.grandeza, ax_mv=ax_mv)
+            destaques = []
+        else:
+            marcar = [chave for chave, marca in self.marcas.items() if marca.isChecked()]
+            destaques = graficos.desenhar_controle(ax_pv, ax_mv, self.resposta, self.titulo,
+                                                   self.ds.unidade, marcar, grandeza=self.ds.grandeza)
+        # Os rótulos de tr, ts e pico ficam escondidos e aparecem no hover dos pontos.
+        self.grafico.definir_destaques(destaques)
         self.grafico.atualizar()
+
+    def _respostas_comparacao(self) -> dict:
+        """IMC e ITAE com o SetPoint atual e a mesma opção de limite do motor.
+
+        Levanta ValueError quando as regras não se aplicam (θ = 0) ou a malha é instável.
+        """
+        return simulacao.comparar_imc_itae(self.modelo, self.campo_lambda.valor(),
+                                           self.resposta.sp, self.ds.y0, self.ds.u0,
+                                           self.resposta.limitada)
 
     def _sem_resultado(self, mensagem: str, papel: str = "alerta"):
         """Apaga o gráfico e as métricas quando não há uma sintonia válida."""
         self.resposta = None
+        # Sem resultado não há o que comparar; desliga para não voltar ligado depois.
+        self.botao_comparar.blockSignals(True)
+        self.botao_comparar.setChecked(False)
+        self.botao_comparar.blockSignals(False)
         for campo in (self.campo_tr, self.campo_ts, self.campo_mp, self.campo_pico,
                       self.campo_erro, self.campo_mv):
             campo.clear()
@@ -374,7 +447,10 @@ class AbaControle(QWidget):
     def _exportar(self):
         if self.resposta is None:
             return
-        nome = "manual" if not self._modo_metodo() else self.combo_metodo.currentText()
+        if self.botao_comparar.isChecked():
+            nome = "comparacao_imc_itae"
+        else:
+            nome = "manual" if not self._modo_metodo() else self.combo_metodo.currentText()
         nome = nome.lower().replace(" ", "_").replace("-", "_")
         caminho = self.grafico.exportar(f"pid_{nome}.png")
         if caminho:

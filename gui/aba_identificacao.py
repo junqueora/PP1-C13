@@ -158,7 +158,8 @@ class AbaIdentificacao(QWidget):
 
         self.grafico.figura.clear()
         ax = self.grafico.figura.add_subplot()
-        graficos.desenhar_identificacao(ax, self.ds, [r], f"Identificação por {metodo}")
+        graficos.desenhar_identificacao(ax, self.ds, [r], f"Identificação por {metodo}",
+                                        self.ds.grandeza)
         self.grafico.atualizar()
         self.modelo_definido.emit(self.ds, r)
 

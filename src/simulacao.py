@@ -7,7 +7,7 @@ import control as ct
 import numpy as np
 
 from src import metricas, modelo as mod, sintonia
-from src.config import MV_MAX, MV_MIN
+from src.config import MV_MAX, MV_MIN, N_FILTRO_DERIVADA
 from src.metricas import Metricas
 from src.modelo import ModeloFOPDT
 from src.sintonia import PID
@@ -23,6 +23,7 @@ class RespostaControle:
     sp: float
     y_inicial: float
     metricas: Metricas
+    limitada: bool = False   # True quando a MV foi limitada à faixa do atuador
 
     @property
     def mv_max(self) -> float:
@@ -71,6 +72,73 @@ def simular_controle(m: ModeloFOPDT, pid: PID, sp: float, y_inicial: float,
     valor_final = y_inicial + degrau * float(np.real(ct.dcgain(pv_sp)))
     medidas = metricas.calcular(t, pv, y_inicial, sp, valor_final)
     return RespostaControle(t, pv, mv, sp, y_inicial, medidas)
+
+
+def simular_controle_saturado(m: ModeloFOPDT, pid: PID, sp: float, y_inicial: float,
+                              u_inicial: float = 0.0, t_final: float | None = None,
+                              dt: float = 0.01) -> RespostaControle:
+    """Simula o degrau de SetPoint com o motor limitado a MV_MIN..MV_MAX.
+
+    Com saturação a malha deixa de ser linear, então a simulação é feita passo a
+    passo, com o atraso exato (buffer do sinal de controle) em vez de Padé. A
+    integral para de acumular enquanto o motor está saturado e o erro empurra
+    para o mesmo lado (anti-windup por congelamento), como num CLP real.
+
+    Levanta ValueError se a malha linear for instável, como simular_controle.
+    """
+    pv_sp, _ = malha_com_pid(m, pid)
+    if not mod.estavel(pv_sp):
+        raise ValueError("Malha fechada instável para estes parâmetros.")
+    if t_final is None:
+        t_final = mod.horizonte(pv_sp, minimo=10 * (m.tau + m.theta))
+    passos = int(round(t_final / dt)) + 1
+    atraso = int(round(m.theta / dt))          # atraso em número de amostras
+    decaimento = np.exp(-dt / m.tau)           # discretização exata da primeira ordem
+    tf = pid.td / N_FILTRO_DERIVADA            # constante do filtro da derivada
+    # Discretização exata do filtro: estável para qualquer Td (Euler explícito
+    # divergiria com dt/tf >= 2, ou seja, Td pequeno).
+    ganho_filtro = 1.0 - np.exp(-dt / tf) if tf > 0 else 1.0
+    t = np.arange(passos) * dt
+    pv = np.empty(passos)
+    mv = np.empty(passos)
+    desvio = integral = erro_filtrado = 0.0    # desvio da PV em relação a y_inicial
+    for i in range(passos):
+        pv[i] = y_inicial + desvio
+        erro = sp - pv[i]
+        derivada = 0.0
+        if pid.td > 0:
+            derivada = pid.td / tf * (erro - erro_filtrado)
+            erro_filtrado += (erro - erro_filtrado) * ganho_filtro
+        tentativa = integral + erro * dt / pid.ti
+        u = u_inicial + pid.kp * (erro + tentativa + derivada)
+        # Anti-windup: não integra quando isso empurraria a MV ainda mais para dentro da
+        # saturação. O sentido do empurrão é o sinal de Kp·erro (vale também para Kp < 0).
+        empurra = pid.kp * erro
+        if not ((u > MV_MAX and empurra > 0) or (u < MV_MIN and empurra < 0)):
+            integral = tentativa
+        mv[i] = min(max(u, MV_MIN), MV_MAX)
+        u_atrasado = mv[i - atraso] if i >= atraso else u_inicial
+        desvio = decaimento * desvio + (1.0 - decaimento) * m.k * (u_atrasado - u_inicial)
+
+    # Se o SetPoint pede mais motor do que existe, a PV para onde o motor saturado leva.
+    u_regime = min(max(u_inicial + (sp - y_inicial) / m.k, MV_MIN), MV_MAX)
+    valor_final = y_inicial + m.k * (u_regime - u_inicial)
+    medidas = metricas.calcular(t, pv, y_inicial, sp, valor_final)
+    return RespostaControle(t, pv, mv, sp, y_inicial, medidas, limitada=True)
+
+
+def comparar_imc_itae(m: ModeloFOPDT, lam: float | None, sp: float, y_inicial: float,
+                      u_inicial: float = 0.0, limitada: bool = False) -> dict:
+    """Respostas do IMC e do ITAE no mesmo degrau: {nome: RespostaControle}.
+
+    Se `lam` for inválido para o IMC, usa λ = 1,2·θ. Levanta ValueError quando as
+    regras não se aplicam (θ = 0) ou a malha é instável.
+    """
+    lam = sintonia.lambda_ou_padrao(m, lam)
+    imc = sintonia.sintonizar("IMC", m, lam)
+    simular = simular_controle_saturado if limitada else simular_controle
+    sintonias = {f"IMC (λ = {lam:.3g} s)": imc, "ITAE": sintonia.sintonizar("ITAE", m)}
+    return {nome: simular(m, pid, sp, y_inicial, u_inicial) for nome, pid in sintonias.items()}
 
 
 def simular_malha(sistema, ganho_final: float, t_final: float):
